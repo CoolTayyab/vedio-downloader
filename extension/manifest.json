@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Video Downloader",
+  "version": "1.0.0",
+  "description": "Paste any video link, pick a format and quality, and download it.",
+  "permissions": ["downloads", "storage", "activeTab"],
+  "host_permissions": ["https://YOUR-BACKEND-DOMAIN.example.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Video Downloader"
+  }
+}

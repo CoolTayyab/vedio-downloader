@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body{
+    width:320px;
+    margin:0;
+    font-family:'Segoe UI', Arial, sans-serif;
+    background:#0f1220;
+    color:#f1f2f6;
+  }
+  header{
+    padding:14px 16px;
+    background:linear-gradient(90deg,#7c5cff,#22d3ee);
+  }
+  header h1{
+    margin:0;
+    font-size:1rem;
+    color:#0f1224;
+  }
+  main{ padding:14px 16px 18px; }
+  label{
+    display:block;
+    font-size:0.75rem;
+    color:#9aa0b4;
+    margin-bottom:6px;
+  }
+  input[type=text]{
+    width:100%;
+    padding:9px;
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.15);
+    background:#0f1224;
+    color:#f1f2f6;
+    box-sizing:border-box;
+    margin-bottom:10px;
+  }
+  .row{ display:flex; gap:8px; }
+  select{
+    flex:1;
+    padding:8px;
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.15);
+    background:#0f1224;
+    color:#f1f2f6;
+    margin-bottom:12px;
+  }
+  button{
+    width:100%;
+    padding:10px;
+    border:none;
+    border-radius:6px;
+    background:linear-gradient(90deg,#22d3ee,#7c5cff);
+    color:#0f1224;
+    font-weight:600;
+    cursor:pointer;
+  }
+  button:disabled{ opacity:.6; cursor:not-allowed; }
+  #status{
+    margin-top:10px;
+    font-size:0.8rem;
+    text-align:center;
+    color:#9aa0b4;
+    min-height:16px;
+  }
+  #status.error{ color:#ff5c7a; }
+  #status.success{ color:#3ddc97; }
+</style>
+</head>
+<body>
+<header><h1>Video Downloader</h1></header>
+<main>
+  <label>Video link</label>
+  <input type="text" id="url" placeholder="Paste video link here">
+
+  <div class="row">
+    <select id="type">
+      <option value="mp4">MP4 (Video)</option>
+      <option value="mp3">MP3 (Audio)</option>
+    </select>
+    <select id="quality">
+      <option value="best">Best</option>
+      <option value="1080">1080p</option>
+      <option value="720">720p</option>
+      <option value="480">480p</option>
+      <option value="360">360p</option>
+    </select>
+  </div>
+
+  <button id="downloadBtn">Download</button>
+  <div id="status"></div>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

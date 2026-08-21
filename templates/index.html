@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- ================= SEO META TAGS ================= -->
+<title>Free Video Downloader Online - Download MP4, MP3 & HD Video</title>
+<meta name="description" content="Free online video downloader. Paste any video link and download in MP4, MP3, or audio format, in 360p, 480p, 720p, or 1080p quality. Fast, free, no signup.">
+<meta name="keywords" content="video downloader, mp4 downloader, mp3 downloader, hd video downloader, online video downloader, free video download">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://yourdomain.com/">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Free Video Downloader Online - MP4, MP3 & HD">
+<meta property="og:description" content="Paste any video link and download it as MP4, MP3, or audio in 360p to 1080p quality — fast and free.">
+<meta property="og:url" content="https://yourdomain.com/">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Free Video Downloader Online - MP4, MP3 & HD">
+<meta name="twitter:description" content="Paste any video link and download it as MP4, MP3, or audio in 360p to 1080p quality — fast and free.">
+
+<!-- Basic structured data for search engines -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Video Downloader",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Any",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+<!-- =================================================== -->
+
+<style>
+  :root{
+    --bg:#0f1220;
+    --card:#171b2e;
+    --accent:#7c5cff;
+    --accent2:#22d3ee;
+    --text:#f1f2f6;
+    --muted:#9aa0b4;
+    --danger:#ff5c7a;
+    --success:#3ddc97;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:
+      linear-gradient(rgba(10,8,20,0.55), rgba(10,8,20,0.8)),
+      url('/static/background.jpg') center top / cover no-repeat fixed;
+    color:var(--text);
+    min-height:100vh;
+  }
+  header{
+    text-align:center;
+    padding:48px 20px 24px;
+  }
+  header h1{
+    font-size:2.1rem;
+    margin:0 0 8px;
+    background:linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+  header p{
+    color:var(--muted);
+    margin:0;
+    font-size:1rem;
+  }
+  .card{
+    max-width:640px;
+    margin:0 auto 40px;
+    background:rgba(23,27,46,0.82);
+    backdrop-filter:blur(6px);
+    border-radius:16px;
+    padding:28px;
+    box-shadow:0 10px 40px rgba(0,0,0,.35);
+    border:1px solid rgba(255,255,255,0.06);
+  }
+  .url-row{
+    display:flex;
+    gap:10px;
+  }
+  input[type=text]{
+    flex:1;
+    padding:14px 16px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:#0f1224;
+    color:var(--text);
+    font-size:0.95rem;
+    outline:none;
+  }
+  input[type=text]:focus{
+    border-color:var(--accent);
+  }
+  .options{
+    display:flex;
+    gap:12px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+  .option-group{
+    flex:1;
+    min-width:140px;
+  }
+  .option-group label{
+    display:block;
+    font-size:0.8rem;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  select{
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:#0f1224;
+    color:var(--text);
+    font-size:0.9rem;
+  }
+  button#downloadBtn{
+    margin-top:20px;
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    font-size:1rem;
+    font-weight:600;
+    color:#0f1224;
+    background:linear-gradient(90deg, var(--accent2), var(--accent));
+    cursor:pointer;
+    transition:transform .15s ease, opacity .15s ease;
+  }
+  button#downloadBtn:hover{ transform:translateY(-1px); }
+  button#downloadBtn:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
+
+  #status{
+    margin-top:16px;
+    font-size:0.9rem;
+    text-align:center;
+    min-height:20px;
+  }
+  #status.error{ color:var(--danger); }
+  #status.success{ color:var(--success); }
+  #status.working{ color:var(--muted); }
+
+  .info-sections{
+    max-width:640px;
+    margin:0 auto 60px;
+    padding:0 20px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  .info-sections h2{
+    color:var(--text);
+    font-size:1.2rem;
+    margin-top:32px;
+  }
+  footer{
+    text-align:center;
+    color:var(--muted);
+    font-size:0.8rem;
+    padding:24px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Video Downloader</h1>
+  <p>Paste a link, pick a format and quality, download instantly.</p>
+</header>
+
+<main class="card">
+  <div class="url-row">
+    <input type="text" id="url" placeholder="Paste video link here (YouTube, etc.)">
+  </div>
+
+  <div class="options">
+    <div class="option-group">
+      <label for="type">Format</label>
+      <select id="type">
+        <option value="mp4">Video (MP4)</option>
+        <option value="mp3">Audio Only (MP3)</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label for="quality">Quality</label>
+      <select id="quality">
+        <option value="best">Best available</option>
+        <option value="1080">1080p (Full HD)</option>
+        <option value="720">720p (HD)</option>
+        <option value="480">480p</option>
+        <option value="360">360p</option>
+      </select>
+    </div>
+  </div>
+
+  <button id="downloadBtn">Download</button>
+  <div id="status"></div>
+</main>
+
+<section class="info-sections">
+  <h2>How it works</h2>
+  <p>Paste the link to any video, choose whether you want the full video (MP4) or just the audio (MP3), select a quality, and click Download. The file saves straight to your browser's downloads folder.</p>
+
+  <h2>Supported quality</h2>
+  <p>Choose from 360p up to 1080p Full HD for video downloads, or extract MP3 audio at a standard 192kbps bitrate.</p>
+
+  <h2>Is this free?</h2>
+  <p>Yes, this tool is completely free to use with no signup required.</p>
+</section>
+
+<footer>
+  &copy; <span id="year"></span> Video Downloader. For personal use only.
+</footer>
+
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+
+const btn = document.getElementById('downloadBtn');
+const status = document.getElementById('status');
+
+function setStatus(msg, cls) {
+  status.textContent = msg;
+  status.className = cls || '';
+}
+
+async function downloadVideo() {
+  const url = document.getElementById('url').value.trim();
+  const type = document.getElementById('type').value;
+  const quality = document.getElementById('quality').value;
+
+  if (!url) {
+    setStatus('Please paste a video link first.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus('Fetching and preparing your file... this can take a moment.', 'working');
+
+  try {
+    const res = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, type, quality })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setStatus('Error: ' + (err.error || 'Something went wrong.'), 'error');
+      btn.disabled = false;
+      return;
+    }
+
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?(.+?)"?$/);
+    const filename = match ? match[1] : (type === 'mp3' ? 'audio.mp3' : 'video.mp4');
+
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setStatus('Download complete!', 'success');
+  } catch (e) {
+    setStatus('Something went wrong: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+btn.addEventListener('click', downloadVideo);
+document.getElementById('url').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') downloadVideo();
+});
+</script>
+
+</body>
+</html>
