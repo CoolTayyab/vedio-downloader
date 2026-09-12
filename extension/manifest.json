@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Paste any video link, pick a format and quality, and download it.",
   "permissions": ["downloads", "storage", "activeTab"],
-  "host_permissions": ["https://YOUR-BACKEND-DOMAIN.example.com/*"],
+  "host_permissions": ["https://vedio-downloader-production.up.railway.app/*"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Video Downloader"

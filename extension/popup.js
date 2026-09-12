@@ -1,6 +1,6 @@
 // IMPORTANT: replace this with your real deployed backend URL once hosted
 // e.g. "https://your-app-name.onrender.com"
-const BACKEND_URL = "https://YOUR-BACKEND-DOMAIN.example.com";
+const BACKEND_URL = "https://vedio-downloader-production.up.railway.app";
 
 const btn = document.getElementById("downloadBtn");
 const status = document.getElementById("status");

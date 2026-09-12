@@ -3,176 +3,109 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<!-- ================= SEO META TAGS ================= -->
 <title>Free Video Downloader Online - Download MP4, MP3 & HD Video</title>
 <meta name="description" content="Free online video downloader. Paste any video link and download in MP4, MP3, or audio format, in 360p, 480p, 720p, or 1080p quality. Fast, free, no signup.">
 <meta name="keywords" content="video downloader, mp4 downloader, mp3 downloader, hd video downloader, online video downloader, free video download">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://yourdomain.com/">
-
-<!-- Open Graph / Facebook -->
-<meta property="og:type" content="website">
-<meta property="og:title" content="Free Video Downloader Online - MP4, MP3 & HD">
-<meta property="og:description" content="Paste any video link and download it as MP4, MP3, or audio in 360p to 1080p quality — fast and free.">
-<meta property="og:url" content="https://yourdomain.com/">
-
-<!-- Twitter -->
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Free Video Downloader Online - MP4, MP3 & HD">
-<meta name="twitter:description" content="Paste any video link and download it as MP4, MP3, or audio in 360p to 1080p quality — fast and free.">
-
-<!-- Basic structured data for search engines -->
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  "name": "Video Downloader",
-  "applicationCategory": "MultimediaApplication",
-  "operatingSystem": "Any",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD"
-  }
-}
-</script>
-<!-- =================================================== -->
 
 <style>
   :root{
-    --bg:#0f1220;
-    --card:#171b2e;
-    --accent:#7c5cff;
-    --accent2:#22d3ee;
-    --text:#f1f2f6;
-    --muted:#9aa0b4;
-    --danger:#ff5c7a;
-    --success:#3ddc97;
+    --bg:#0f1220; --card:#171b2e; --accent:#7c5cff; --accent2:#22d3ee;
+    --text:#f1f2f6; --muted:#9aa0b4; --danger:#ff5c7a; --success:#3ddc97;
   }
   *{box-sizing:border-box;}
-  body{
-    margin:0;
-    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+  body{ margin:0; font-family:'Segoe UI', Roboto, Arial, sans-serif;
     background:
       linear-gradient(rgba(10,8,20,0.55), rgba(10,8,20,0.8)),
       url('/static/background.jpg') center top / cover no-repeat fixed;
-    color:var(--text);
-    min-height:100vh;
-  }
-  header{
-    text-align:center;
-    padding:48px 20px 24px;
-  }
-  header h1{
-    font-size:2.1rem;
-    margin:0 0 8px;
+    color:var(--text); min-height:100vh; }
+  header{ text-align:center; padding:48px 20px 24px; }
+  header h1{ font-size:2.1rem; margin:0 0 8px;
     background:linear-gradient(90deg, var(--accent), var(--accent2));
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-  }
-  header p{
-    color:var(--muted);
-    margin:0;
-    font-size:1rem;
-  }
-  .card{
-    max-width:640px;
-    margin:0 auto 40px;
-    background:rgba(23,27,46,0.82);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  header p{ color:var(--muted); margin:0; font-size:1rem; }
+  .card{ max-width:640px; margin:0 auto 40px; background:rgba(23,27,46,0.82);
     backdrop-filter:blur(6px);
-    border-radius:16px;
-    padding:28px;
-    box-shadow:0 10px 40px rgba(0,0,0,.35);
-    border:1px solid rgba(255,255,255,0.06);
-  }
-  .url-row{
-    display:flex;
-    gap:10px;
-  }
-  input[type=text]{
-    flex:1;
-    padding:14px 16px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,0.12);
+    border-radius:16px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,.35);
+    border:1px solid rgba(255,255,255,0.06); }
+  .url-row{ display:flex; gap:10px; }
+  input[type=text]{ flex:1; padding:14px 16px; border-radius:10px;
+    border:1px solid rgba(255,255,255,0.12); background:#0f1224;
+    color:var(--text); font-size:0.95rem; outline:none; }
+  input[type=text]:focus{ border-color:var(--accent); }
+
+  /* ---------- PREVIEW CARD ---------- */
+  #preview-box{
+    display:none;
+    margin-top:18px;
     background:#0f1224;
-    color:var(--text);
-    font-size:0.95rem;
-    outline:none;
+    border-radius:12px;
+    padding:14px;
+    border:1px solid rgba(255,255,255,0.08);
   }
-  input[type=text]:focus{
-    border-color:var(--accent);
+  #preview-box.show{ display:flex; gap:14px; align-items:center; }
+  #preview-thumb{
+    width:120px; height:68px; border-radius:8px; object-fit:cover;
+    flex-shrink:0; background:#1c2140;
   }
-  .options{
-    display:flex;
-    gap:12px;
-    margin-top:16px;
-    flex-wrap:wrap;
+  #preview-info{ min-width:0; }
+  #preview-title{
+    font-size:0.9rem; font-weight:600; margin:0 0 4px;
+    overflow:hidden; text-overflow:ellipsis; display:-webkit-box;
+    -webkit-line-clamp:2; -webkit-box-orient:vertical;
   }
-  .option-group{
-    flex:1;
-    min-width:140px;
+  #preview-meta{ font-size:0.78rem; color:var(--muted); margin:0; }
+  #preview-loading, #preview-error{
+    font-size:0.85rem; color:var(--muted); margin-top:12px; display:none;
   }
-  .option-group label{
-    display:block;
-    font-size:0.8rem;
-    color:var(--muted);
-    margin-bottom:6px;
-  }
-  select{
-    width:100%;
-    padding:12px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,0.12);
-    background:#0f1224;
-    color:var(--text);
-    font-size:0.9rem;
-  }
-  button#downloadBtn{
-    margin-top:20px;
-    width:100%;
-    padding:15px;
-    border:none;
-    border-radius:10px;
-    font-size:1rem;
-    font-weight:600;
-    color:#0f1224;
+  #preview-error{ color:var(--danger); }
+
+  .options{ display:flex; gap:12px; margin-top:16px; flex-wrap:wrap; }
+  .option-group{ flex:1; min-width:140px; }
+  .option-group label{ display:block; font-size:0.8rem; color:var(--muted); margin-bottom:6px; }
+  select{ width:100%; padding:12px; border-radius:10px;
+    border:1px solid rgba(255,255,255,0.12); background:#0f1224;
+    color:var(--text); font-size:0.9rem; }
+  button#downloadBtn{ margin-top:20px; width:100%; padding:15px; border:none;
+    border-radius:10px; font-size:1rem; font-weight:600; color:#0f1224;
     background:linear-gradient(90deg, var(--accent2), var(--accent));
-    cursor:pointer;
-    transition:transform .15s ease, opacity .15s ease;
-  }
+    cursor:pointer; transition:transform .15s ease, opacity .15s ease; }
   button#downloadBtn:hover{ transform:translateY(-1px); }
   button#downloadBtn:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
 
-  #status{
+  /* ---------- PROGRESS BAR ---------- */
+  #progress-wrap{
+    display:none;
     margin-top:16px;
-    font-size:0.9rem;
-    text-align:center;
-    min-height:20px;
   }
+  #progress-track{
+    width:100%;
+    height:10px;
+    background:#0f1224;
+    border-radius:6px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,0.1);
+  }
+  #progress-fill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg, var(--accent2), var(--accent));
+    transition:width 0.3s ease;
+  }
+  #progress-label{
+    text-align:center;
+    font-size:0.8rem;
+    color:var(--muted);
+    margin-top:6px;
+  }
+  #status{ margin-top:16px; font-size:0.9rem; text-align:center; min-height:20px; }
   #status.error{ color:var(--danger); }
   #status.success{ color:var(--success); }
   #status.working{ color:var(--muted); }
-
-  .info-sections{
-    max-width:640px;
-    margin:0 auto 60px;
-    padding:0 20px;
-    color:var(--muted);
-    line-height:1.6;
-  }
-  .info-sections h2{
-    color:var(--text);
-    font-size:1.2rem;
-    margin-top:32px;
-  }
-  footer{
-    text-align:center;
-    color:var(--muted);
-    font-size:0.8rem;
-    padding:24px;
-  }
+  .info-sections{ max-width:640px; margin:0 auto 60px; padding:0 20px;
+    color:var(--muted); line-height:1.6; }
+  .info-sections h2{ color:var(--text); font-size:1.2rem; margin-top:32px; }
+  footer{ text-align:center; color:var(--muted); font-size:0.8rem; padding:24px; }
 </style>
 </head>
 <body>
@@ -185,6 +118,17 @@
 <main class="card">
   <div class="url-row">
     <input type="text" id="url" placeholder="Paste video link here (YouTube, etc.)">
+  </div>
+
+  <div id="preview-loading">Fetching video info...</div>
+  <div id="preview-error"></div>
+
+  <div id="preview-box">
+    <img id="preview-thumb" src="" alt="Video thumbnail">
+    <div id="preview-info">
+      <p id="preview-title"></p>
+      <p id="preview-meta"></p>
+    </div>
   </div>
 
   <div class="options">
@@ -208,67 +152,204 @@
   </div>
 
   <button id="downloadBtn">Download</button>
+
+  <div id="progress-wrap">
+    <div id="progress-track">
+      <div id="progress-fill"></div>
+    </div>
+    <div id="progress-label">Starting...</div>
+  </div>
+
   <div id="status"></div>
 </main>
 
 <section class="info-sections">
   <h2>How it works</h2>
-  <p>Paste the link to any video, choose whether you want the full video (MP4) or just the audio (MP3), select a quality, and click Download. The file saves straight to your browser's downloads folder.</p>
-
+  <p>Paste the link to any video, choose whether you want the full video (MP4) or just the audio (MP3), select a quality, and click Download.</p>
   <h2>Supported quality</h2>
-  <p>Choose from 360p up to 1080p Full HD for video downloads, or extract MP3 audio at a standard 192kbps bitrate.</p>
-
+  <p>Choose from 360p up to 1080p Full HD for video downloads, or extract MP3 audio at 192kbps.</p>
   <h2>Is this free?</h2>
   <p>Yes, this tool is completely free to use with no signup required.</p>
 </section>
 
-<footer>
-  &copy; <span id="year"></span> Video Downloader. For personal use only.
-</footer>
+<footer>&copy; <span id="year"></span> Video Downloader. For personal use only.</footer>
 
 <script>
 document.getElementById('year').textContent = new Date().getFullYear();
 
+const urlInput = document.getElementById('url');
 const btn = document.getElementById('downloadBtn');
 const status = document.getElementById('status');
+const previewBox = document.getElementById('preview-box');
+const previewThumb = document.getElementById('preview-thumb');
+const previewTitle = document.getElementById('preview-title');
+const previewMeta = document.getElementById('preview-meta');
+const previewLoading = document.getElementById('preview-loading');
+const previewError = document.getElementById('preview-error');
 
 function setStatus(msg, cls) {
   status.textContent = msg;
   status.className = cls || '';
 }
 
+function formatDuration(seconds) {
+  if (!seconds) return '';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function resetPreview() {
+  previewBox.classList.remove('show');
+  previewLoading.style.display = 'none';
+  previewError.style.display = 'none';
+}
+
+let previewDebounce;
+urlInput.addEventListener('input', () => {
+  clearTimeout(previewDebounce);
+  const url = urlInput.value.trim();
+  resetPreview();
+
+  if (!url || url.length < 10) return;
+
+  // Wait a moment after typing stops before fetching, so we don't
+  // fire a request on every keystroke while the user is still pasting.
+  previewDebounce = setTimeout(() => fetchPreview(url), 500);
+});
+
+async function fetchPreview(url) {
+  previewLoading.style.display = 'block';
+  previewError.style.display = 'none';
+  previewBox.classList.remove('show');
+
+  try {
+    const res = await fetch('/api/info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    const data = await res.json();
+    previewLoading.style.display = 'none';
+
+    if (!res.ok || data.error) {
+      previewError.textContent = "Couldn't preview this link — check it's correct, or just try downloading directly.";
+      previewError.style.display = 'block';
+      return;
+    }
+
+    previewThumb.src = data.thumbnail || '';
+    previewThumb.onerror = () => { previewThumb.style.display = 'none'; };
+    previewThumb.style.display = '';
+
+    if (data.type === 'playlist') {
+      previewTitle.textContent = data.title || 'Playlist';
+      previewMeta.textContent = `Playlist • ${data.count} video${data.count === 1 ? '' : 's'} — will download as a ZIP`;
+    } else {
+      previewTitle.textContent = data.title || 'Untitled video';
+      const parts = [];
+      if (data.uploader) parts.push(data.uploader);
+      if (data.duration) parts.push(formatDuration(data.duration));
+      previewMeta.textContent = parts.join(' • ');
+    }
+
+    previewBox.classList.add('show');
+  } catch (e) {
+    previewLoading.style.display = 'none';
+    previewError.textContent = "Couldn't reach the server to preview this link.";
+    previewError.style.display = 'block';
+  }
+}
+
+const progressWrap = document.getElementById('progress-wrap');
+const progressFill = document.getElementById('progress-fill');
+const progressLabel = document.getElementById('progress-label');
+
+function resetProgress() {
+  progressWrap.style.display = 'none';
+  progressFill.style.width = '0%';
+  progressLabel.textContent = 'Starting...';
+}
+
+function updateProgress(percent, label) {
+  progressWrap.style.display = 'block';
+  progressFill.style.width = Math.min(percent, 100) + '%';
+  progressLabel.textContent = label;
+}
+
+async function pollProgress(jobId) {
+  return new Promise((resolve, reject) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/progress/${jobId}`);
+        const data = await res.json();
+
+        if (data.error) {
+          clearInterval(interval);
+          reject(new Error(data.error));
+          return;
+        }
+
+        if (data.status === 'downloading') {
+          const label = data.detail ? `${data.detail} — ${data.percent || 0}%` : `Downloading... ${data.percent || 0}%`;
+          updateProgress(data.percent || 0, label);
+        } else if (data.status === 'processing') {
+          updateProgress(data.percent || 95, data.detail || 'Processing file...');
+        } else if (data.status === 'finished') {
+          updateProgress(100, 'Done!');
+          clearInterval(interval);
+          resolve();
+        } else if (data.status === 'error') {
+          clearInterval(interval);
+          reject(new Error(data.error || 'Download failed'));
+        }
+      } catch (e) {
+        clearInterval(interval);
+        reject(e);
+      }
+    }, 800);
+  });
+}
+
 async function downloadVideo() {
-  const url = document.getElementById('url').value.trim();
+  const url = urlInput.value.trim();
   const type = document.getElementById('type').value;
   const quality = document.getElementById('quality').value;
 
-  if (!url) {
-    setStatus('Please paste a video link first.', 'error');
-    return;
-  }
+  if (!url) { setStatus('Please paste a video link first.', 'error'); return; }
 
   btn.disabled = true;
-  setStatus('Fetching and preparing your file... this can take a moment.', 'working');
+  resetProgress();
+  setStatus('Starting download...', 'working');
 
   try {
-    const res = await fetch('/api/download', {
+    const startRes = await fetch('/api/start-download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, type, quality })
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      setStatus('Error: ' + (err.error || 'Something went wrong.'), 'error');
-      btn.disabled = false;
-      return;
+    const startData = await startRes.json();
+    if (!startRes.ok || startData.error) {
+      throw new Error(startData.error || 'Could not start download.');
     }
 
-    const disposition = res.headers.get('Content-Disposition') || '';
+    setStatus('', '');
+    await pollProgress(startData.job_id);
+
+    // File is ready server-side — fetch it and trigger the browser save.
+    const fileRes = await fetch(`/api/fetch/${startData.job_id}`);
+    if (!fileRes.ok) {
+      const err = await fileRes.json().catch(() => ({}));
+      throw new Error(err.error || 'Could not retrieve the finished file.');
+    }
+
+    const disposition = fileRes.headers.get('Content-Disposition') || '';
     const match = disposition.match(/filename="?(.+?)"?$/);
     const filename = match ? match[1] : (type === 'mp3' ? 'audio.mp3' : 'video.mp4');
 
-    const blob = await res.blob();
+    const blob = await fileRes.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -278,17 +359,15 @@ async function downloadVideo() {
 
     setStatus('Download complete!', 'success');
   } catch (e) {
-    setStatus('Something went wrong: ' + e.message, 'error');
+    setStatus('Error: ' + e.message, 'error');
+    resetProgress();
   } finally {
     btn.disabled = false;
   }
 }
 
 btn.addEventListener('click', downloadVideo);
-document.getElementById('url').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') downloadVideo();
-});
+urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') downloadVideo(); });
 </script>
-
 </body>
 </html>
