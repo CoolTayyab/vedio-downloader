@@ -16,7 +16,13 @@ BASE_OPTS = {
     "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     "noplaylist": True,
     "quiet": True,
+    # Do NOT use the "generic" extractor: it would download any direct file link
+    # (.exe, .apk, .zip ...) and serve it from this domain -> Google "harmful downloads" flag.
+    "allowed_extractors": ["default", "-generic"],
 }
+
+# Only these file types may ever be served to users
+ALLOWED_EXTS = {".mp4", ".mp3", ".m4a", ".webm", ".mkv", ".srt", ".zip"}
 
 # ---- optional YouTube cookies (free fix for "Sign in to confirm you're not a bot") ----
 # Put the cookies.txt content, base64-encoded, in the environment variable YT_COOKIES_B64
@@ -236,7 +242,8 @@ def run_single_download_job(job_id, url, media_type, quality, subs=""):
                 raise
     files = [f for f in glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*")) if not f.endswith(".zip")]
     sub_files = [f for f in files if f.endswith(".srt")]
-    media_files = [f for f in files if f not in sub_files and not f.endswith((".part", ".ytdl", ".vtt"))]
+    media_files = [f for f in files if f not in sub_files and not f.endswith((".part", ".ytdl", ".vtt"))
+                   and os.path.splitext(f)[1].lower() in ALLOWED_EXTS]
     note = ""
     if (subs or media_type == "srt") and not sub_files:
         note = "No subtitles are available for this video."
@@ -307,7 +314,7 @@ def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, 
         raise yt_dlp.utils.DownloadCancelled("cancelled")
     # keep only fully finished files (skip .part, fragments like .f137.mp4, temp files)
     bad = re.compile(r"(\.part|\.ytdl|\.temp|\.vtt|\.f\d+(-\w+)?\.\w+|\.zip)$", re.I)
-    files = [f for f in sorted(glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}_*"))) if not bad.search(f)]
+    files = [f for f in sorted(glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}_*"))) if not bad.search(f) and os.path.splitext(f)[1].lower() in ALLOWED_EXTS]
     if not files:
         if stopped:
             raise yt_dlp.utils.DownloadCancelled("cancelled")
@@ -441,6 +448,9 @@ def download():
         title = safe_name(info.get("title"))
         path = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))[0]
         ext = os.path.splitext(path)[1]
+        if ext.lower() not in ALLOWED_EXTS:
+            remove_job_files(job_id)
+            raise Exception("unsupported url")
         resp = send_file(path, as_attachment=True, download_name=f"{title}{ext}")
         def cleanup():
             time.sleep(30)
