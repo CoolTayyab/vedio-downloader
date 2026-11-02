@@ -310,6 +310,11 @@ def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, 
 def index():
     return render_template("index.html")
 
+# Google Search Console ownership verification (must be served at the site root)
+@app.route("/google7f332598abb08dc8.html")
+def google_verification():
+    return "google-site-verification: google7f332598abb08dc8.html", 200, {"Content-Type": "text/html; charset=utf-8"}
+
 @app.route("/api/info", methods=["POST"])
 def api_info():
     url = (request.get_json(silent=True) or {}).get("url", "").strip()
