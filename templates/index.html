@@ -2,372 +2,190 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Free Video Downloader Online - Download MP4, MP3 & HD Video</title>
-<meta name="description" content="Free online video downloader. Paste any video link and download in MP4, MP3, or audio format, in 360p, 480p, 720p, or 1080p quality. Fast, free, no signup.">
-<meta name="keywords" content="video downloader, mp4 downloader, mp3 downloader, hd video downloader, online video downloader, free video download">
-<meta name="robots" content="index, follow">
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free Online Video Downloader - MP4 & MP3</title>
+<meta name="description" content="Download videos and playlists as MP4 or MP3 for free. Paste a link, choose quality, and download.">
 <style>
-  :root{
-    --bg:#0f1220; --card:#171b2e; --accent:#7c5cff; --accent2:#22d3ee;
-    --text:#f1f2f6; --muted:#9aa0b4; --danger:#ff5c7a; --success:#3ddc97;
-  }
-  *{box-sizing:border-box;}
-  body{ margin:0; font-family:'Segoe UI', Roboto, Arial, sans-serif;
-    background:
-      linear-gradient(rgba(10,8,20,0.55), rgba(10,8,20,0.8)),
-      url('/static/background.jpg') center top / cover no-repeat fixed;
-    color:var(--text); min-height:100vh; }
-  header{ text-align:center; padding:48px 20px 24px; }
-  header h1{ font-size:2.1rem; margin:0 0 8px;
-    background:linear-gradient(90deg, var(--accent), var(--accent2));
-    -webkit-background-clip:text; background-clip:text; color:transparent; }
-  header p{ color:var(--muted); margin:0; font-size:1rem; }
-  .card{ max-width:640px; margin:0 auto 40px; background:rgba(23,27,46,0.82);
-    backdrop-filter:blur(6px);
-    border-radius:16px; padding:28px; box-shadow:0 10px 40px rgba(0,0,0,.35);
-    border:1px solid rgba(255,255,255,0.06); }
-  .url-row{ display:flex; gap:10px; }
-  input[type=text]{ flex:1; padding:14px 16px; border-radius:10px;
-    border:1px solid rgba(255,255,255,0.12); background:#0f1224;
-    color:var(--text); font-size:0.95rem; outline:none; }
-  input[type=text]:focus{ border-color:var(--accent); }
-
-  /* ---------- PREVIEW CARD ---------- */
-  #preview-box{
-    display:none;
-    margin-top:18px;
-    background:#0f1224;
-    border-radius:12px;
-    padding:14px;
-    border:1px solid rgba(255,255,255,0.08);
-  }
-  #preview-box.show{ display:flex; gap:14px; align-items:center; }
-  #preview-thumb{
-    width:120px; height:68px; border-radius:8px; object-fit:cover;
-    flex-shrink:0; background:#1c2140;
-  }
-  #preview-info{ min-width:0; }
-  #preview-title{
-    font-size:0.9rem; font-weight:600; margin:0 0 4px;
-    overflow:hidden; text-overflow:ellipsis; display:-webkit-box;
-    -webkit-line-clamp:2; -webkit-box-orient:vertical;
-  }
-  #preview-meta{ font-size:0.78rem; color:var(--muted); margin:0; }
-  #preview-loading, #preview-error{
-    font-size:0.85rem; color:var(--muted); margin-top:12px; display:none;
-  }
-  #preview-error{ color:var(--danger); }
-
-  .options{ display:flex; gap:12px; margin-top:16px; flex-wrap:wrap; }
-  .option-group{ flex:1; min-width:140px; }
-  .option-group label{ display:block; font-size:0.8rem; color:var(--muted); margin-bottom:6px; }
-  select{ width:100%; padding:12px; border-radius:10px;
-    border:1px solid rgba(255,255,255,0.12); background:#0f1224;
-    color:var(--text); font-size:0.9rem; }
-  button#downloadBtn{ margin-top:20px; width:100%; padding:15px; border:none;
-    border-radius:10px; font-size:1rem; font-weight:600; color:#0f1224;
-    background:linear-gradient(90deg, var(--accent2), var(--accent));
-    cursor:pointer; transition:transform .15s ease, opacity .15s ease; }
-  button#downloadBtn:hover{ transform:translateY(-1px); }
-  button#downloadBtn:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
-
-  /* ---------- PROGRESS BAR ---------- */
-  #progress-wrap{
-    display:none;
-    margin-top:16px;
-  }
-  #progress-track{
-    width:100%;
-    height:10px;
-    background:#0f1224;
-    border-radius:6px;
-    overflow:hidden;
-    border:1px solid rgba(255,255,255,0.1);
-  }
-  #progress-fill{
-    height:100%;
-    width:0%;
-    background:linear-gradient(90deg, var(--accent2), var(--accent));
-    transition:width 0.3s ease;
-  }
-  #progress-label{
-    text-align:center;
-    font-size:0.8rem;
-    color:var(--muted);
-    margin-top:6px;
-  }
-  #status{ margin-top:16px; font-size:0.9rem; text-align:center; min-height:20px; }
-  #status.error{ color:var(--danger); }
-  #status.success{ color:var(--success); }
-  #status.working{ color:var(--muted); }
-  .info-sections{ max-width:640px; margin:0 auto 60px; padding:0 20px;
-    color:var(--muted); line-height:1.6; }
-  .info-sections h2{ color:var(--text); font-size:1.2rem; margin-top:32px; }
-  footer{ text-align:center; color:var(--muted); font-size:0.8rem; padding:24px; }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;color:#f1f2f6;
+    background:#0f1224 url('/static/background.jpg') center/cover fixed no-repeat;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{width:100%;max-width:560px;background:rgba(15,18,36,.82);backdrop-filter:blur(8px);border-radius:18px;padding:28px;box-shadow:0 10px 40px rgba(0,0,0,.45)}
+  h1{margin:0 0 6px;font-size:1.6rem;background:linear-gradient(90deg,#7c5cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+  p.sub{margin:0 0 18px;color:#9aa0b4;font-size:.9rem}
+  input,select{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#0f1224;color:#f1f2f6;font-size:.95rem}
+  label{display:block;font-size:.8rem;color:#9aa0b4;margin:12px 0 6px}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  button{width:100%;margin-top:18px;padding:14px;border:none;border-radius:10px;font-weight:600;font-size:1rem;color:#0f1224;background:linear-gradient(90deg,#22d3ee,#7c5cff);cursor:pointer}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  #preview-box{display:none;margin-top:14px;gap:12px;align-items:center;background:rgba(255,255,255,.06);border-radius:10px;padding:10px}
+  #preview-thumb{width:96px;height:60px;object-fit:cover;border-radius:6px;background:#222}
+  #preview-title{font-weight:600;font-size:.9rem}
+  #preview-meta{font-size:.78rem;color:#9aa0b4;margin-top:3px}
+  #preview-loading{display:none;margin-top:12px;font-size:.85rem;color:#9aa0b4}
+  #preview-error{display:none;margin-top:12px;font-size:.85rem;color:#ff6b6b}
+  #range-box{display:none;margin-top:6px;padding:12px;border-radius:10px;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.35)}
+  #range-box .hint{font-size:.78rem;color:#9aa0b4;margin-top:8px}
+  #progress-wrap{display:none;margin-top:18px}
+  #progress-track{height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden}
+  #progress-fill{height:100%;width:0;background:linear-gradient(90deg,#22d3ee,#7c5cff);transition:width .3s}
+  #progress-label{font-size:.82rem;color:#9aa0b4;margin-top:6px}
+  #status{margin-top:12px;font-size:.88rem;min-height:1.2em}
+  #status.err{color:#ff6b6b}#status.ok{color:#4ade80}
 </style>
 </head>
 <body>
-
-<header>
+<div class="card">
   <h1>Video Downloader</h1>
-  <p>Paste a link, pick a format and quality, download instantly.</p>
-</header>
+  <p class="sub">Paste a link, pick a format, and download. Playlists are supported (up to 25 videos per batch).</p>
 
-<main class="card">
-  <div class="url-row">
-    <input type="text" id="url" placeholder="Paste video link here (YouTube, etc.)">
-  </div>
+  <input id="url" type="text" placeholder="Paste video or playlist link here..." autocomplete="off">
 
-  <div id="preview-loading">Fetching video info...</div>
+  <div id="preview-loading">Loading preview...</div>
   <div id="preview-error"></div>
-
   <div id="preview-box">
-    <img id="preview-thumb" src="" alt="Video thumbnail">
-    <div id="preview-info">
-      <p id="preview-title"></p>
-      <p id="preview-meta"></p>
-    </div>
+    <img id="preview-thumb" alt="">
+    <div><div id="preview-title"></div><div id="preview-meta"></div></div>
   </div>
 
-  <div class="options">
-    <div class="option-group">
-      <label for="type">Format</label>
-      <select id="type">
-        <option value="mp4">Video (MP4)</option>
-        <option value="mp3">Audio Only (MP3)</option>
-      </select>
+  <div id="range-box">
+    <div class="row">
+      <div><label style="margin-top:0">From video #</label><input id="range-start" type="number" min="1" value="1"></div>
+      <div><label style="margin-top:0">To video #</label><input id="range-end" type="number" min="1" value="25"></div>
     </div>
-    <div class="option-group">
-      <label for="quality">Quality</label>
-      <select id="quality">
-        <option value="best">Best available</option>
-        <option value="1080">1080p (Full HD)</option>
-        <option value="720">720p (HD)</option>
-        <option value="480">480p</option>
-        <option value="360">360p</option>
-      </select>
-    </div>
+    <div class="hint" id="range-hint"></div>
   </div>
 
-  <button id="downloadBtn">Download</button>
+  <div class="row">
+    <div><label>Format</label>
+      <select id="type"><option value="mp4">MP4 (video)</option><option value="mp3">MP3 (audio)</option></select></div>
+    <div><label>Quality</label>
+      <select id="quality"><option value="best">Best</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option><option value="360p">360p</option></select></div>
+  </div>
+
+  <button id="dl-btn">Download</button>
+  <button id="cancel-btn" style="display:none;background:#ff5d5d;color:#fff">Stop &amp; save finished videos</button>
 
   <div id="progress-wrap">
-    <div id="progress-track">
-      <div id="progress-fill"></div>
-    </div>
-    <div id="progress-label">Starting...</div>
+    <div id="progress-track"><div id="progress-fill"></div></div>
+    <div id="progress-label"></div>
   </div>
-
   <div id="status"></div>
-</main>
-
-<section class="info-sections">
-  <h2>How it works</h2>
-  <p>Paste the link to any video, choose whether you want the full video (MP4) or just the audio (MP3), select a quality, and click Download.</p>
-  <h2>Supported quality</h2>
-  <p>Choose from 360p up to 1080p Full HD for video downloads, or extract MP3 audio at 192kbps.</p>
-  <h2>Is this free?</h2>
-  <p>Yes, this tool is completely free to use with no signup required.</p>
-</section>
-
-<footer>&copy; <span id="year"></span> Video Downloader. For personal use only.</footer>
+</div>
 
 <script>
-document.getElementById('year').textContent = new Date().getFullYear();
+const MAX_BATCH = 25;
+const $ = id => document.getElementById(id);
+let currentJob = null, debounce, playlistCount = 0, isPlaylist = false;
 
-const urlInput = document.getElementById('url');
-const btn = document.getElementById('downloadBtn');
-const status = document.getElementById('status');
-const previewBox = document.getElementById('preview-box');
-const previewThumb = document.getElementById('preview-thumb');
-const previewTitle = document.getElementById('preview-title');
-const previewMeta = document.getElementById('preview-meta');
-const previewLoading = document.getElementById('preview-loading');
-const previewError = document.getElementById('preview-error');
+function fmtDur(s){ if(!s) return ""; const m=Math.floor(s/60), r=s%60; return m+":"+String(r).padStart(2,"0"); }
 
-function setStatus(msg, cls) {
-  status.textContent = msg;
-  status.className = cls || '';
+function updateRangeHint(){
+  const s = parseInt($("range-start").value)||1, e = parseInt($("range-end").value)||s;
+  const n = e - s + 1;
+  let msg = `Selected: ${n>0?n:0} video(s). Max ${MAX_BATCH} per batch.`;
+  if (playlistCount > MAX_BATCH) {
+    const next = e + 1;
+    if (next <= playlistCount) msg += ` Next batch: ${next}-${Math.min(playlistCount, next+MAX_BATCH-1)}.`;
+  }
+  $("range-hint").textContent = msg;
 }
-
-function formatDuration(seconds) {
-  if (!seconds) return '';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-  return `${m}:${s}`;
-}
-
-function resetPreview() {
-  previewBox.classList.remove('show');
-  previewLoading.style.display = 'none';
-  previewError.style.display = 'none';
-}
-
-let previewDebounce;
-urlInput.addEventListener('input', () => {
-  clearTimeout(previewDebounce);
-  const url = urlInput.value.trim();
-  resetPreview();
-
-  if (!url || url.length < 10) return;
-
-  // Wait a moment after typing stops before fetching, so we don't
-  // fire a request on every keystroke while the user is still pasting.
-  previewDebounce = setTimeout(() => fetchPreview(url), 500);
+$("range-start").addEventListener("input", () => {
+  const s = parseInt($("range-start").value)||1;
+  $("range-end").value = Math.min(playlistCount||s+MAX_BATCH-1, s+MAX_BATCH-1);
+  updateRangeHint();
 });
+$("range-end").addEventListener("input", updateRangeHint);
 
-async function fetchPreview(url) {
-  previewLoading.style.display = 'block';
-  previewError.style.display = 'none';
-  previewBox.classList.remove('show');
-
-  try {
-    const res = await fetch('/api/info', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url })
-    });
-
-    const data = await res.json();
-    previewLoading.style.display = 'none';
-
-    if (!res.ok || data.error) {
-      previewError.textContent = "Couldn't preview this link — check it's correct, or just try downloading directly.";
-      previewError.style.display = 'block';
-      return;
-    }
-
-    previewThumb.src = data.thumbnail || '';
-    previewThumb.onerror = () => { previewThumb.style.display = 'none'; };
-    previewThumb.style.display = '';
-
-    if (data.type === 'playlist') {
-      previewTitle.textContent = data.title || 'Playlist';
-      previewMeta.textContent = `Playlist • ${data.count} video${data.count === 1 ? '' : 's'} — will download as a ZIP`;
-    } else {
-      previewTitle.textContent = data.title || 'Untitled video';
-      const parts = [];
-      if (data.uploader) parts.push(data.uploader);
-      if (data.duration) parts.push(formatDuration(data.duration));
-      previewMeta.textContent = parts.join(' • ');
-    }
-
-    previewBox.classList.add('show');
-  } catch (e) {
-    previewLoading.style.display = 'none';
-    previewError.textContent = "Couldn't reach the server to preview this link.";
-    previewError.style.display = 'block';
-  }
-}
-
-const progressWrap = document.getElementById('progress-wrap');
-const progressFill = document.getElementById('progress-fill');
-const progressLabel = document.getElementById('progress-label');
-
-function resetProgress() {
-  progressWrap.style.display = 'none';
-  progressFill.style.width = '0%';
-  progressLabel.textContent = 'Starting...';
-}
-
-function updateProgress(percent, label) {
-  progressWrap.style.display = 'block';
-  progressFill.style.width = Math.min(percent, 100) + '%';
-  progressLabel.textContent = label;
-}
-
-async function pollProgress(jobId) {
-  return new Promise((resolve, reject) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/progress/${jobId}`);
-        const data = await res.json();
-
-        if (data.error) {
-          clearInterval(interval);
-          reject(new Error(data.error));
-          return;
-        }
-
-        if (data.status === 'downloading') {
-          const label = data.detail ? `${data.detail} — ${data.percent || 0}%` : `Downloading... ${data.percent || 0}%`;
-          updateProgress(data.percent || 0, label);
-        } else if (data.status === 'processing') {
-          updateProgress(data.percent || 95, data.detail || 'Processing file...');
-        } else if (data.status === 'finished') {
-          updateProgress(100, 'Done!');
-          clearInterval(interval);
-          resolve();
-        } else if (data.status === 'error') {
-          clearInterval(interval);
-          reject(new Error(data.error || 'Download failed'));
-        }
-      } catch (e) {
-        clearInterval(interval);
-        reject(e);
+async function fetchPreview(url){
+  $("preview-box").style.display="none"; $("preview-error").style.display="none"; $("range-box").style.display="none";
+  isPlaylist=false; playlistCount=0;
+  if(!/^https?:\/\//i.test(url)) return;
+  $("preview-loading").style.display="block";
+  try{
+    const r = await fetch("/api/info",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
+    const data = await r.json();
+    $("preview-loading").style.display="none";
+    if(!r.ok){ $("preview-error").textContent=data.error||"Could not load preview."; $("preview-error").style.display="block"; return; }
+    $("preview-thumb").src = data.thumbnail || "";
+    $("preview-title").textContent = data.title || "";
+    if(data.type==="playlist"){
+      isPlaylist=true; playlistCount=data.count;
+      $("preview-meta").textContent = `Playlist • ${data.count} videos`;
+      if(data.count > MAX_BATCH){
+        $("range-start").value=1; $("range-end").value=MAX_BATCH;
+        $("range-start").max=data.count; $("range-end").max=data.count;
+        $("range-box").style.display="block";
+        updateRangeHint();
       }
-    }, 800);
-  });
+    } else {
+      $("preview-meta").textContent = [data.uploader, fmtDur(data.duration)].filter(Boolean).join(" • ");
+    }
+    $("preview-box").style.display="flex";
+  }catch(e){
+    $("preview-loading").style.display="none";
+    $("preview-error").textContent="Could not load preview."; $("preview-error").style.display="block";
+  }
 }
+$("url").addEventListener("input", () => { clearTimeout(debounce); debounce=setTimeout(()=>fetchPreview($("url").value.trim()),600); });
 
-async function downloadVideo() {
-  const url = urlInput.value.trim();
-  const type = document.getElementById('type').value;
-  const quality = document.getElementById('quality').value;
+function setStatus(msg,cls){ $("status").textContent=msg; $("status").className=cls||""; }
 
-  if (!url) { setStatus('Please paste a video link first.', 'error'); return; }
-
-  btn.disabled = true;
-  resetProgress();
-  setStatus('Starting download...', 'working');
-
-  try {
-    const startRes = await fetch('/api/start-download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, type, quality })
-    });
-
-    const startData = await startRes.json();
-    if (!startRes.ok || startData.error) {
-      throw new Error(startData.error || 'Could not start download.');
-    }
-
-    setStatus('', '');
-    await pollProgress(startData.job_id);
-
-    // File is ready server-side — fetch it and trigger the browser save.
-    const fileRes = await fetch(`/api/fetch/${startData.job_id}`);
-    if (!fileRes.ok) {
-      const err = await fileRes.json().catch(() => ({}));
-      throw new Error(err.error || 'Could not retrieve the finished file.');
-    }
-
-    const disposition = fileRes.headers.get('Content-Disposition') || '';
-    const match = disposition.match(/filename="?(.+?)"?$/);
-    const filename = match ? match[1] : (type === 'mp3' ? 'audio.mp3' : 'video.mp4');
-
-    const blob = await fileRes.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    setStatus('Download complete!', 'success');
-  } catch (e) {
-    setStatus('Error: ' + e.message, 'error');
-    resetProgress();
-  } finally {
-    btn.disabled = false;
+async function pollProgress(jobId){
+  while(true){
+    const r = await fetch("/api/progress/"+jobId);
+    const d = await r.json();
+    if(d.status==="cancelled") throw new Error("Download stopped. Nothing was completed yet, so no file was saved.");
+    if(d.status==="error") throw new Error(d.error||"Download failed");
+    $("progress-fill").style.width=(d.percent||0)+"%";
+    $("progress-label").textContent = (d.detail? d.detail+" — ":"") + Math.round(d.percent||0)+"%";
+    if(d.status==="finished") return;
+    await new Promise(res=>setTimeout(res,800));
   }
 }
 
-btn.addEventListener('click', downloadVideo);
-urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') downloadVideo(); });
+async function downloadVideo(){
+  const url=$("url").value.trim();
+  if(!url){ setStatus("Please paste a link first.","err"); return; }
+  const body={url,type:$("type").value,quality:$("quality").value};
+  if(isPlaylist && playlistCount>MAX_BATCH){
+    const s=parseInt($("range-start").value), e=parseInt($("range-end").value);
+    if(!s||!e||e<s){ setStatus("Please enter a valid range.","err"); return; }
+    if(e-s+1>MAX_BATCH){ setStatus(`Please select at most ${MAX_BATCH} videos at a time.`,"err"); return; }
+    body.start=s; body.end=e;
+  }
+  $("dl-btn").disabled=true; setStatus("");
+  $("progress-wrap").style.display="block"; $("progress-fill").style.width="0";
+  $("progress-label").textContent="Starting...";
+  try{
+    const r=await fetch("/api/start-download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||"Could not start download");
+    currentJob = d.job_id; $("cancel-btn").style.display="block";
+    await pollProgress(d.job_id);
+    $("cancel-btn").style.display="none"; currentJob=null;
+    $("progress-label").textContent="Downloading file to your device...";
+    const f=await fetch("/api/fetch/"+d.job_id);
+    if(!f.ok) throw new Error("Could not fetch file");
+    const cd=f.headers.get("Content-Disposition")||"";
+    let name="download";
+    const m=/filename\*=UTF-8''([^;]+)/i.exec(cd)||/filename="?([^";]+)"?/i.exec(cd);
+    if(m) name=decodeURIComponent(m[1]);
+    const blob=await f.blob();
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=name; a.click();
+    setStatus("Done! Check your Downloads folder.","ok");
+    $("progress-label").textContent="Complete";
+  }catch(e){
+    setStatus(e.message,"err"); $("progress-wrap").style.display="none";
+  }finally{ $("dl-btn").disabled=false; $("cancel-btn").style.display="none"; currentJob=null; }
+}
+$("cancel-btn").addEventListener("click",()=>{
+  if(currentJob){ fetch("/api/cancel/"+currentJob,{method:"POST"}); $("cancel-btn").disabled=true; $("progress-label").textContent="Stopping... saving the videos that are already finished"; setTimeout(()=>{$("cancel-btn").disabled=false},3000); }
+});
+// if the user closes/reloads the tab mid-download, stop the server job so it doesn't waste resources
+window.addEventListener("pagehide",()=>{ if(currentJob) navigator.sendBeacon("/api/cancel/"+currentJob+"?discard=1"); });
+$("dl-btn").addEventListener("click",downloadVideo);
+$("url").addEventListener("keydown",e=>{ if(e.key==="Enter") downloadVideo(); });
 </script>
 </body>
 </html>

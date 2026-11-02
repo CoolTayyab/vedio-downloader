@@ -1,13 +1,7 @@
 from flask import Flask, request, send_file, jsonify, render_template
 from flask_cors import CORS
 import yt_dlp
-import uuid
-import os
-import glob
-import time
-import threading
-import webbrowser
-import zipfile
+import uuid, os, glob, time, threading, webbrowser, zipfile, re
 from collections import defaultdict
 
 app = Flask(__name__)
@@ -16,420 +10,341 @@ CORS(app)
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+MAX_PLAYLIST_SIZE = 25  # max videos per batch
+
 BASE_OPTS = {
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["android", "web"]
-        }
-    },
+    "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     "noplaylist": True,
     "quiet": True,
 }
 
-RATE_LIMIT_WINDOW = 60
-RATE_LIMIT_MAX = 5
-request_log = defaultdict(list)
+# ---- simple rate limit: 5 requests / 60 s per IP ----
+hits = defaultdict(list)
+def is_rate_limited(ip, limit=5, window=60):
+    now = time.time()
+    hits[ip] = [t for t in hits[ip] if now - t < window]
+    if len(hits[ip]) >= limit:
+        return True
+    hits[ip].append(now)
+    return False
 
-# ---------- In-memory job store for progress tracking ----------
-# job_id -> { status: 'downloading'|'finished'|'error', percent: float,
-#             file_path: str|None, download_name: str|None, error: str|None }
-# Fine for a single-instance small app; not meant to survive server restarts
-# or scale across multiple server processes.
 jobs = {}
 jobs_lock = threading.Lock()
 
+def set_job(job_id, **kw):
+    with jobs_lock:
+        j = jobs.setdefault(job_id, {"created": time.time()})
+        if j.get("cancel") and kw.get("status") in ("downloading", "processing"):
+            kw.pop("status")  # never overwrite a cancel request
+        j.update(kw)
 
-def is_rate_limited(ip: str) -> bool:
-    now = time.time()
-    request_log[ip] = [t for t in request_log[ip] if now - t < RATE_LIMIT_WINDOW]
-    if len(request_log[ip]) >= RATE_LIMIT_MAX:
-        return True
-    request_log[ip].append(now)
-    return False
+def is_cancelled(job_id):
+    with jobs_lock:
+        return bool(jobs.get(job_id, {}).get("cancel"))
 
+def check_cancel(job_id):
+    if is_cancelled(job_id):
+        raise yt_dlp.utils.DownloadCancelled("cancelled")
 
-def friendly_error_message(raw_error: str) -> str:
-    """Translates common yt-dlp/network error text into a short,
-    user-friendly English message instead of showing raw technical output."""
-    err = (raw_error or "").lower()
+def remove_job_files(job_id):
+    for f in glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}*")):
+        try: os.remove(f)
+        except OSError: pass
 
-    if "private video" in err or "private" in err:
-        return "This video is private and can't be downloaded."
-    if "video unavailable" in err or "this video is unavailable" in err:
-        return "This video is unavailable — it may have been removed or the link is incorrect."
-    if ("sign in to confirm your age" in err) or ("age" in err and "restrict" in err):
-        return "This video is age-restricted and can't be downloaded without an account."
-    if "copyright" in err:
-        return "This video has been taken down due to a copyright claim."
-    if "403" in err or "forbidden" in err:
-        return "The platform blocked this download. Please try again in a moment."
-    if "404" in err or "not found" in err:
-        return "This link couldn't be found — please check the URL and try again."
-    if "unsupported url" in err or "no video formats found" in err:
-        return "This link isn't supported, or no downloadable video was found."
-    if "ffmpeg" in err and ("not found" in err or "not installed" in err):
-        return "A required tool is missing on the server. Please try again later."
-    if "network" in err or "timed out" in err or "connection" in err:
-        return "A network error occurred — please check your connection and try again."
-    if "unable to download webpage" in err or "http error" in err:
-        return "Couldn't reach this link. Please double-check the URL."
-    if "live event" in err or "is live" in err:
-        return "Live streams can't be downloaded while they're still airing."
+def janitor():
+    """Every 5 min: delete leftover files/jobs older than 60 min (abandoned downloads)."""
+    while True:
+        time.sleep(300)
+        now = time.time()
+        for f in glob.glob(os.path.join(DOWNLOAD_DIR, "*")):
+            try:
+                if now - os.path.getmtime(f) > 3600:
+                    os.remove(f)
+            except OSError:
+                pass
+        with jobs_lock:
+            for jid in [j for j, v in jobs.items() if now - v.get("created", now) > 3600]:
+                jobs.pop(jid, None)
 
-    # Fallback: don't show raw stack-trace-style text to the user.
+threading.Thread(target=janitor, daemon=True).start()
+
+def friendly_error_message(raw):
+    r = (raw or "").lower()
+    if "private" in r:
+        return "This video is private and cannot be downloaded."
+    if "unavailable" in r or "removed" in r or "deleted" in r:
+        return "This video is unavailable. It may have been removed."
+    if "sign in" in r or "age" in r and "restrict" in r:
+        return "This video is age-restricted or requires login, so it cannot be downloaded."
+    if "copyright" in r:
+        return "This video is blocked due to copyright."
+    if "403" in r:
+        return "The site refused the request (403). Please try again in a moment."
+    if "404" in r:
+        return "Video not found. Please check the link."
+    if "unsupported url" in r:
+        return "This link is not supported. Please paste a direct video link."
+    if "ffmpeg" in r:
+        return "Server is missing a required tool (ffmpeg) to process this video."
+    if "network" in r or "timed out" in r or "connection" in r:
+        return "Network problem while contacting the site. Please try again."
+    if "live" in r:
+        return "Live streams cannot be downloaded."
     return "Something went wrong while processing this link. Please check the URL and try again."
 
-
-def build_format(media_type: str, quality: str) -> str:
+def build_format(media_type, quality):
     if media_type == "mp3":
         return "bestaudio/best"
-    if quality == "best" or not quality:
+    if quality == "best":
         return "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
-    height = quality.replace("p", "")
-    return (
-        f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/"
-        f"best[height<={height}][ext=mp4]/best[height<={height}]"
-    )
+    h = quality.replace("p", "")
+    return f"bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/best[height<={h}][ext=mp4]/best[height<={h}]"
 
+def safe_name(s):
+    return re.sub(r'[\\/:*?"<>|]', "_", s or "download").strip()[:80] or "download"
 
-def run_download_job(job_id: str, url: str, media_type: str, quality: str):
-    """Detects whether the link is a playlist or a single video, then
-    hands off to the right handler."""
+def resolve_range(total, start, end):
+    """Return (start, end) validated, or raise ValueError with a friendly message."""
     try:
-        with yt_dlp.YoutubeDL({**BASE_OPTS, "extract_flat": True, "noplaylist": False}) as probe:
-            probe_info = probe.extract_info(url, download=False)
-    except Exception as e:
-        with jobs_lock:
-            jobs[job_id].update({"status": "error", "error": friendly_error_message(str(e))})
-        return
+        start = int(start) if start not in (None, "") else 1
+        end = int(end) if end not in (None, "") else min(total, start + MAX_PLAYLIST_SIZE - 1)
+    except (TypeError, ValueError):
+        raise ValueError("Start and end must be numbers.")
+    if start < 1 or end < start:
+        raise ValueError("Invalid range: start must be 1 or more and end must not be less than start.")
+    if start > total:
+        raise ValueError(f"This playlist only has {total} videos.")
+    end = min(end, total)
+    if end - start + 1 > MAX_PLAYLIST_SIZE:
+        raise ValueError(f"You can download at most {MAX_PLAYLIST_SIZE} videos at a time. Please choose a smaller range.")
+    return start, end
 
-    is_playlist = bool(probe_info and probe_info.get("_type") == "playlist" and probe_info.get("entries"))
+def run_download_job(job_id, url, media_type, quality, start, end):
+    try:
+        set_job(job_id, status="downloading", percent=0, detail="Checking link...")
+        probe_opts = dict(BASE_OPTS, noplaylist=False, extract_flat=True)
+        with yt_dlp.YoutubeDL(probe_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        is_playlist = info.get("_type") == "playlist" and info.get("entries")
+        if is_playlist:
+            entries = [e for e in info["entries"] if e]
+            total = info.get("playlist_count") or len(entries)
+            s, e = resolve_range(total, start, end)
+            run_playlist_download_job(job_id, url, media_type, quality, info.get("title"), s, e)
+        else:
+            run_single_download_job(job_id, url, media_type, quality)
+    except yt_dlp.utils.DownloadCancelled:
+        remove_job_files(job_id)
+        set_job(job_id, status="cancelled", detail="Cancelled")
+    except ValueError as ve:
+        set_job(job_id, status="error", error=str(ve))
+    except Exception as ex:
+        remove_job_files(job_id)
+        if is_cancelled(job_id):
+            set_job(job_id, status="cancelled", detail="Cancelled")
+        else:
+            set_job(job_id, status="error", error=friendly_error_message(str(ex)))
 
-    if is_playlist:
-        run_playlist_download_job(job_id, url, media_type, quality)
-    else:
-        run_single_download_job(job_id, url, media_type, quality)
-
-
-def run_single_download_job(job_id: str, url: str, media_type: str, quality: str):
-    """Runs in a background thread. Updates the shared `jobs` dict as
-    yt-dlp reports progress, so the frontend can poll and show a bar."""
-
-    def progress_hook(d):
-        with jobs_lock:
-            job = jobs.get(job_id)
-            if not job:
-                return
-            if d.get("status") == "downloading":
-                total = d.get("total_bytes") or d.get("total_bytes_estimate")
-                downloaded = d.get("downloaded_bytes", 0)
-                if total:
-                    job["percent"] = round(downloaded / total * 100, 1)
-                job["status"] = "downloading"
-            elif d.get("status") == "finished":
-                # yt-dlp finished writing the raw stream; postprocessing
-                # (merging/mp3 conversion) may still be running after this.
-                job["percent"] = 95
-                job["status"] = "processing"
-
-    file_id = str(uuid.uuid4())
-    outtmpl = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
-
-    ydl_opts = {
-        **BASE_OPTS,
-        "outtmpl": outtmpl,
-        "format": build_format(media_type, quality),
-        "progress_hooks": [progress_hook],
-    }
-
+def run_single_download_job(job_id, url, media_type, quality):
+    def hook(d):
+        check_cancel(job_id)
+        if d["status"] == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            pct = (d.get("downloaded_bytes", 0) / total * 100) if total else 0
+            set_job(job_id, status="downloading", percent=round(pct, 1), detail="")
+        elif d["status"] == "finished":
+            set_job(job_id, status="processing", percent=100, detail="Processing...")
+    opts = dict(BASE_OPTS,
+                format=build_format(media_type, quality),
+                outtmpl=os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s"),
+                progress_hooks=[hook])
     if media_type == "mp3":
-        ydl_opts["postprocessors"] = [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }]
+        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
     else:
-        ydl_opts["merge_output_format"] = "mp4"
+        opts["merge_output_format"] = "mp4"
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        title = safe_name(info.get("title"))
+    files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
+    if not files:
+        raise Exception("download failed")
+    path = files[0]
+    ext = os.path.splitext(path)[1]
+    set_job(job_id, status="finished", percent=100, file_path=path, download_name=f"{title}{ext}", detail="")
 
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-
-        base = os.path.splitext(filename)[0]
-        matches = glob.glob(base + ".*")
-        final_path = matches[0] if matches else filename
-
-        safe_title = "".join(
-            c for c in (info.get("title") or "video") if c.isalnum() or c in " -_"
-        ).strip() or "video"
-        ext = os.path.splitext(final_path)[1]
-        download_name = f"{safe_title}{ext}"
-
-        with jobs_lock:
-            jobs[job_id].update({
-                "status": "finished",
-                "percent": 100,
-                "file_path": final_path,
-                "download_name": download_name,
-            })
-    except Exception as e:
-        with jobs_lock:
-            jobs[job_id].update({"status": "error", "error": friendly_error_message(str(e))})
-
-
-def run_playlist_download_job(job_id: str, url: str, media_type: str, quality: str):
-    """Downloads every video in a playlist, then zips them into one file.
-    Progress is tracked as (videos finished + current video's own progress)
-    divided by the total video count, so the bar moves smoothly across
-    the whole playlist rather than jumping per video."""
-
-    def progress_hook(d):
-        with jobs_lock:
-            job = jobs.get(job_id)
-            if not job:
-                return
-            info = d.get("info_dict") or {}
-            idx = info.get("playlist_index") or 1
-            count = info.get("playlist_count") or 1
-
-            if d.get("status") == "downloading":
-                total = d.get("total_bytes") or d.get("total_bytes_estimate")
-                downloaded = d.get("downloaded_bytes", 0)
-                item_fraction = (downloaded / total) if total else 0
-                overall = ((idx - 1) + item_fraction) / count * 100
-                job["percent"] = round(min(overall, 99), 1)
-                job["status"] = "downloading"
-                job["detail"] = f"Video {idx} of {count}"
-            elif d.get("status") == "finished":
-                overall = idx / count * 100
-                job["percent"] = round(min(overall, 99), 1)
-                job["status"] = "processing"
-                job["detail"] = f"Finished video {idx} of {count} — processing"
-
-    outtmpl = os.path.join(DOWNLOAD_DIR, f"{job_id}_%(playlist_index)s - %(title)s.%(ext)s")
-    ydl_opts = {
-        **BASE_OPTS,
-        "noplaylist": False,
-        "outtmpl": outtmpl,
-        "format": build_format(media_type, quality),
-        "progress_hooks": [progress_hook],
-    }
-
+def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, start, end):
+    batch = end - start + 1
+    def hook(d):
+        check_cancel(job_id)
+        idx = d.get("info_dict", {}).get("playlist_index") or start
+        pos = max(1, min(batch, idx - start + 1))
+        if d["status"] == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            frac = (d.get("downloaded_bytes", 0) / total) if total else 0
+            pct = ((pos - 1) + frac) / batch * 100
+            set_job(job_id, status="downloading", percent=round(pct, 1), detail=f"Video {pos} of {batch}")
+        elif d["status"] == "finished":
+            set_job(job_id, detail=f"Video {pos} of {batch} - processing")
+    opts = dict(BASE_OPTS,
+                noplaylist=False,
+                playlist_items=f"{start}-{end}",
+                format=build_format(media_type, quality),
+                outtmpl=os.path.join(DOWNLOAD_DIR, f"{job_id}_%(playlist_index)s - %(title)s.%(ext)s"),
+                progress_hooks=[hook],
+                ignoreerrors=True)
     if media_type == "mp3":
-        ydl_opts["postprocessors"] = [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }]
+        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
     else:
-        ydl_opts["merge_output_format"] = "mp4"
-
+        opts["merge_output_format"] = "mp4"
+    stopped = False
     try:
-        with jobs_lock:
-            jobs[job_id]["status"] = "downloading"
-            jobs[job_id]["detail"] = "Starting playlist download..."
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-
-        playlist_title = info.get("title") or "playlist"
-        safe_title = "".join(
-            c for c in playlist_title if c.isalnum() or c in " -_"
-        ).strip() or "playlist"
-
-        with jobs_lock:
-            jobs[job_id]["status"] = "processing"
-            jobs[job_id]["detail"] = "Packing files into a ZIP..."
-
-        files = sorted(glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}_*.*")))
-        files = [f for f in files if not f.endswith(".part")]
-
-        if not files:
-            raise RuntimeError("No videos were downloaded from this playlist.")
-
-        zip_path = os.path.join(DOWNLOAD_DIR, f"{job_id}.zip")
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for f in files:
-                # Strip the "{job_id}_" prefix so filenames inside the
-                # zip look clean (e.g. "1 - Song Name.mp3").
-                arcname = os.path.basename(f).split(f"{job_id}_", 1)[-1]
-                zf.write(f, arcname=arcname)
-
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.extract_info(url, download=True)
+    except yt_dlp.utils.DownloadCancelled:
+        stopped = True
+    with jobs_lock:
+        discard = bool(jobs.get(job_id, {}).get("discard"))
+    if stopped and discard:
+        raise yt_dlp.utils.DownloadCancelled("cancelled")
+    # keep only fully finished files (skip .part, fragments like .f137.mp4, temp files)
+    bad = re.compile(r"(\.part|\.ytdl|\.temp|\.f\d+(-\w+)?\.\w+|\.zip)$", re.I)
+    files = [f for f in sorted(glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}_*"))) if not bad.search(f)]
+    if not files:
+        if stopped:
+            raise yt_dlp.utils.DownloadCancelled("cancelled")
+        raise Exception("download failed")
+    set_job(job_id, status="processing", percent=100, detail="Creating ZIP...")
+    zip_path = os.path.join(DOWNLOAD_DIR, f"{job_id}.zip")
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
         for f in files:
-            try:
-                os.remove(f)
-            except OSError:
-                pass
+            z.write(f, arcname=os.path.basename(f)[len(job_id) + 1:])
 
-        with jobs_lock:
-            jobs[job_id].update({
-                "status": "finished",
-                "percent": 100,
-                "file_path": zip_path,
-                "download_name": f"{safe_title}.zip",
-            })
-    except Exception as e:
-        with jobs_lock:
-            jobs[job_id].update({"status": "error", "error": friendly_error_message(str(e))})
-
-
+    for f in glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}_*")):
+        try: os.remove(f)
+        except OSError: pass
+    name = f"{safe_name(playlist_title)} ({start}-{end}){' - partial' if stopped else ''}.zip"
+    set_job(job_id, status="finished", percent=100, file_path=zip_path, download_name=name, detail="")
 
 @app.route("/")
-def home():
+def index():
     return render_template("index.html")
 
-
 @app.route("/api/info", methods=["POST"])
-def get_info():
-    url = (request.json or {}).get("url")
+def api_info():
+    url = (request.get_json(silent=True) or {}).get("url", "").strip()
     if not url:
-        return jsonify({"error": "No URL provided"}), 400
+        return jsonify({"error": "No URL"}), 400
     try:
-        # extract_flat + noplaylist=False lets us detect a playlist link
-        # cheaply (without fully resolving every video in it) while still
-        # returning full details for an ordinary single-video link.
-        flat_opts = {**BASE_OPTS, "extract_flat": True, "noplaylist": False}
-        with yt_dlp.YoutubeDL(flat_opts) as ydl:
+        opts = dict(BASE_OPTS, noplaylist=False, extract_flat=True)
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
-
         if info.get("_type") == "playlist" and info.get("entries"):
-            entries = list(info.get("entries") or [])
-            first_thumb = None
-            if entries:
+            entries = [e for e in info["entries"] if e]
+            count = info.get("playlist_count") or len(entries)
+            thumb = info.get("thumbnail")
+            if not thumb and entries:
                 thumbs = entries[0].get("thumbnails") or []
-                first_thumb = entries[0].get("thumbnail") or (thumbs[-1]["url"] if thumbs else None)
-            return jsonify({
-                "type": "playlist",
-                "title": info.get("title") or "Playlist",
-                "count": len(entries),
-                "thumbnail": first_thumb,
-            })
+                thumb = thumbs[-1]["url"] if thumbs else None
+            return jsonify({"type": "playlist", "title": info.get("title"), "count": count,
+                            "thumbnail": thumb, "too_large": count > MAX_PLAYLIST_SIZE,
+                            "max_batch": MAX_PLAYLIST_SIZE})
+        return jsonify({"type": "video", "title": info.get("title"), "thumbnail": info.get("thumbnail"),
+                        "duration": info.get("duration"), "uploader": info.get("uploader")})
+    except Exception as ex:
+        return jsonify({"error": friendly_error_message(str(ex))}), 400
 
-        return jsonify({
-            "type": "video",
-            "title": info.get("title"),
-            "thumbnail": info.get("thumbnail"),
-            "duration": info.get("duration"),
-            "uploader": info.get("uploader"),
-        })
-    except Exception as e:
-        return jsonify({"error": friendly_error_message(str(e))}), 500
-
-
-# ---------- Progress-based flow (used by the website) ----------
 @app.route("/api/start-download", methods=["POST"])
 def start_download():
-    if is_rate_limited(request.remote_addr):
-        return jsonify({"error": "Too many requests. Please wait a minute and try again."}), 429
-
-    data = request.json or {}
-    url = data.get("url")
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({"error": "Too many requests. Please wait a minute."}), 429
+    data = request.get_json(silent=True) or {}
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "No URL"}), 400
     media_type = data.get("type", "mp4")
     quality = data.get("quality", "best")
-
-    if not url:
-        return jsonify({"error": "No URL provided"}), 400
-
-    job_id = str(uuid.uuid4())
-    with jobs_lock:
-        jobs[job_id] = {"status": "downloading", "percent": 0, "file_path": None,
-                         "download_name": None, "error": None}
-
-    thread = threading.Thread(target=run_download_job, args=(job_id, url, media_type, quality))
-    thread.daemon = True
-    thread.start()
-
+    start, end = data.get("start"), data.get("end")
+    job_id = uuid.uuid4().hex
+    set_job(job_id, status="downloading", percent=0, detail="Starting...")
+    threading.Thread(target=run_download_job, args=(job_id, url, media_type, quality, start, end), daemon=True).start()
     return jsonify({"job_id": job_id})
 
-
-@app.route("/api/progress/<job_id>", methods=["GET"])
-def get_progress(job_id):
+@app.route("/api/cancel/<job_id>", methods=["POST"])
+def cancel(job_id):
+    discard = request.args.get("discard") == "1"
     with jobs_lock:
-        job = jobs.get(job_id)
-        if not job:
-            return jsonify({"error": "Unknown job"}), 404
-        return jsonify({
-            "status": job["status"],
-            "percent": job["percent"],
-            "error": job.get("error"),
-            "detail": job.get("detail"),
-        })
+        j = jobs.get(job_id)
+        if j and j.get("status") not in ("finished", "error", "cancelled"):
+            j["cancel"] = True
+            j["discard"] = discard
+            j["detail"] = "Cancelling..."
+    return jsonify({"ok": True})
 
-
-@app.route("/api/fetch/<job_id>", methods=["GET"])
-def fetch_download(job_id):
+@app.route("/api/progress/<job_id>")
+def progress(job_id):
     with jobs_lock:
-        job = jobs.get(job_id)
-        if not job or job["status"] != "finished":
-            return jsonify({"error": "File not ready"}), 400
-        final_path = job["file_path"]
-        download_name = job["download_name"]
+        j = jobs.get(job_id)
+        if not j:
+            return jsonify({"status": "error", "error": "Unknown job"}), 404
+        if j.get("status") == "cancelled":
+            return jsonify({"status": "cancelled", "percent": 0, "error": None, "detail": "Cancelled"})
+        return jsonify({"status": j.get("status"), "percent": j.get("percent", 0),
+                        "error": j.get("error"), "detail": j.get("detail", "")})
 
-    response = send_file(final_path, as_attachment=True, download_name=download_name)
-
-    @response.call_on_close
+@app.route("/api/fetch/<job_id>")
+def fetch(job_id):
+    with jobs_lock:
+        j = jobs.get(job_id)
+    if not j or j.get("status") != "finished":
+        return jsonify({"error": "Not ready"}), 400
+    path = j["file_path"]
+    resp = send_file(path, as_attachment=True, download_name=j["download_name"])
     def cleanup():
-        try:
-            os.remove(final_path)
-        except OSError:
-            pass
+        time.sleep(30)
+        try: os.remove(path)
+        except OSError: pass
         with jobs_lock:
             jobs.pop(job_id, None)
+    threading.Thread(target=cleanup, daemon=True).start()
+    return resp
 
-    return response
-
-
-# ---------- Simple direct flow (used by the browser extension) ----------
-@app.route("/download", methods=["GET"])
-def download_get():
-    if is_rate_limited(request.remote_addr):
-        return jsonify({"error": "Too many requests. Please wait a minute and try again."}), 429
-
-    url = request.args.get("url")
+# direct flow used by the Chrome extension (single video, no progress)
+@app.route("/download")
+def download():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({"error": "Too many requests. Please wait a minute."}), 429
+    url = request.args.get("url", "").strip()
     media_type = request.args.get("type", "mp4")
     quality = request.args.get("quality", "best")
-
     if not url:
-        return jsonify({"error": "No URL provided"}), 400
-
-    file_id = str(uuid.uuid4())
-    outtmpl = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
-    ydl_opts = {**BASE_OPTS, "outtmpl": outtmpl, "format": build_format(media_type, quality)}
-    if media_type == "mp3":
-        ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
-    else:
-        ydl_opts["merge_output_format"] = "mp4"
-
+        return jsonify({"error": "No URL"}), 400
+    job_id = uuid.uuid4().hex
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        opts = dict(BASE_OPTS, format=build_format(media_type, quality),
+                    outtmpl=os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s"))
+        if media_type == "mp3":
+            opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
+        else:
+            opts["merge_output_format"] = "mp4"
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-
-        base = os.path.splitext(filename)[0]
-        matches = glob.glob(base + ".*")
-        final_path = matches[0] if matches else filename
-        safe_title = "".join(c for c in (info.get("title") or "video") if c.isalnum() or c in " -_").strip() or "video"
-        ext = os.path.splitext(final_path)[1]
-        download_name = f"{safe_title}{ext}"
-
-        response = send_file(final_path, as_attachment=True, download_name=download_name)
-
-        @response.call_on_close
+        title = safe_name(info.get("title"))
+        path = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))[0]
+        ext = os.path.splitext(path)[1]
+        resp = send_file(path, as_attachment=True, download_name=f"{title}{ext}")
         def cleanup():
-            try:
-                os.remove(final_path)
-            except OSError:
-                pass
-
-        return response
-    except Exception as e:
-        return jsonify({"error": friendly_error_message(str(e))}), 500
-
+            time.sleep(30)
+            try: os.remove(path)
+            except OSError: pass
+        threading.Thread(target=cleanup, daemon=True).start()
+        return resp
+    except Exception as ex:
+        return jsonify({"error": friendly_error_message(str(ex))}), 400
 
 def open_browser():
-    webbrowser.open_new("http://127.0.0.1:5000")
-
+    webbrowser.open("http://127.0.0.1:5000")
 
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") != "true":

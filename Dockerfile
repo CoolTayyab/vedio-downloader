@@ -13,4 +13,12 @@ COPY . .
 ENV PORT=5000
 EXPOSE 5000
 
-CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:${PORT} app:app --timeout 120"]
+# IMPORTANT: only 1 worker. Download progress is tracked in an in-memory
+# dict shared across requests — with 2+ workers, a "start download" request
+# and a later "check progress" request can land on different worker
+# processes that don't share memory, causing "Unknown job" errors.
+# A single worker keeps all requests on the same process so progress
+# tracking works correctly. (If this app ever needs to scale to handle
+# many simultaneous users, the fix is to move job state into something
+# shared like Redis instead of adding more workers.)
+CMD ["sh", "-c", "gunicorn -w 1 -b 0.0.0.0:${PORT} app:app --timeout 120"]
