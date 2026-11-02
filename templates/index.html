@@ -57,10 +57,19 @@
 
   <div class="row">
     <div><label>Format</label>
-      <select id="type"><option value="mp4">MP4 (video)</option><option value="mp3">MP3 (audio)</option></select></div>
+      <select id="type"><option value="mp4">MP4 (video)</option><option value="mp3">MP3 (audio)</option><option value="srt">Subtitles only (SRT)</option></select></div>
     <div><label>Quality</label>
       <select id="quality"><option value="best">Best</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option><option value="360p">360p</option></select></div>
   </div>
+
+  <label>Subtitles</label>
+  <select id="subs">
+    <option value="">No subtitles</option>
+    <option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option>
+    <option value="ar">Arabic</option><option value="es">Spanish</option><option value="fr">French</option>
+    <option value="de">German</option><option value="pt">Portuguese</option><option value="ru">Russian</option>
+    <option value="tr">Turkish</option><option value="id">Indonesian</option><option value="bn">Bengali</option>
+  </select>
 
   <button id="dl-btn">Download</button>
   <button id="cancel-btn" style="display:none;background:#ff5d5d;color:#fff">Stop &amp; save finished videos</button>
@@ -75,7 +84,7 @@
 <script>
 const MAX_BATCH = 25;
 const $ = id => document.getElementById(id);
-let currentJob = null, debounce, playlistCount = 0, isPlaylist = false;
+let lastNote = "", currentJob = null, debounce, playlistCount = 0, isPlaylist = false;
 
 function fmtDur(s){ if(!s) return ""; const m=Math.floor(s/60), r=s%60; return m+":"+String(r).padStart(2,"0"); }
 
@@ -138,7 +147,7 @@ async function pollProgress(jobId){
     if(d.status==="error") throw new Error(d.error||"Download failed");
     $("progress-fill").style.width=(d.percent||0)+"%";
     $("progress-label").textContent = (d.detail? d.detail+" — ":"") + Math.round(d.percent||0)+"%";
-    if(d.status==="finished") return;
+    if(d.status==="finished"){ lastNote=d.note||""; return; }
     await new Promise(res=>setTimeout(res,800));
   }
 }
@@ -146,7 +155,7 @@ async function pollProgress(jobId){
 async function downloadVideo(){
   const url=$("url").value.trim();
   if(!url){ setStatus("Please paste a link first.","err"); return; }
-  const body={url,type:$("type").value,quality:$("quality").value};
+  const body={url,type:$("type").value,quality:$("quality").value,subs:$("subs").value};
   if(isPlaylist && playlistCount>MAX_BATCH){
     const s=parseInt($("range-start").value), e=parseInt($("range-end").value);
     if(!s||!e||e<s){ setStatus("Please enter a valid range.","err"); return; }
@@ -173,7 +182,7 @@ async function downloadVideo(){
     const blob=await f.blob();
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob); a.download=name; a.click();
-    setStatus("Done! Check your Downloads folder.","ok");
+    setStatus("Done! Check your Downloads folder." + (lastNote ? " Note: "+lastNote : ""),"ok");
     $("progress-label").textContent="Complete";
   }catch(e){
     setStatus(e.message,"err"); $("progress-wrap").style.display="none";
@@ -184,6 +193,7 @@ $("cancel-btn").addEventListener("click",()=>{
 });
 // if the user closes/reloads the tab mid-download, stop the server job so it doesn't waste resources
 window.addEventListener("pagehide",()=>{ if(currentJob) navigator.sendBeacon("/api/cancel/"+currentJob+"?discard=1"); });
+$("type").addEventListener("change",()=>{ $("quality").disabled = $("type").value!=="mp4"; });
 $("dl-btn").addEventListener("click",downloadVideo);
 $("url").addEventListener("keydown",e=>{ if(e.key==="Enter") downloadVideo(); });
 </script>

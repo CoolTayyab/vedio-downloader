@@ -70,6 +70,8 @@ threading.Thread(target=janitor, daemon=True).start()
 
 def friendly_error_message(raw):
     r = (raw or "").lower()
+    if "no subtitles" in r:
+        return "No subtitles are available for this video."
     if "private" in r:
         return "This video is private and cannot be downloaded."
     if "unavailable" in r or "removed" in r or "deleted" in r:
@@ -100,6 +102,46 @@ def build_format(media_type, quality):
     h = quality.replace("p", "")
     return f"bestvideo[height<={h}][ext=mp4]+bestaudio[ext=m4a]/best[height<={h}][ext=mp4]/best[height<={h}]"
 
+SUB_LANGS = {"en", "ur", "hi", "ar", "es", "fr", "de", "pt", "ru", "tr", "id", "bn"}
+
+def apply_media_opts(opts, media_type, subs=""):
+    """Format options for mp4 / mp3. Subtitles are fetched in a separate pass (download_subs)."""
+    if media_type == "mp3":
+        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
+    else:
+        opts["merge_output_format"] = "mp4"
+    return opts
+
+SUB_CLIENT_ATTEMPTS = [["tv"], ["web_embedded"], ["tv_simply"], ["ios"], ["web", "mweb"]]
+
+def download_subs(url, outtmpl, subs, job_id, playlist_items=None):
+    """Separate pass for subtitles. web/mweb need a PO token for subtitles, so try other
+    clients first and stop as soon as an .srt file exists."""
+    last_err = None
+    for clients in SUB_CLIENT_ATTEMPTS:
+        opts = dict(BASE_OPTS,
+                    extractor_args={"youtube": {"player_client": clients}},
+                    skip_download=True, ignore_no_formats_error=True,
+                    writesubtitles=True, writeautomaticsub=True,
+                    subtitleslangs=[subs], subtitlesformat="srt/vtt/best", outtmpl=outtmpl,
+                    postprocessors=[{"key": "FFmpegSubtitlesConvertor", "format": "srt", "when": "before_dl"}])
+        if playlist_items:
+            opts.update(noplaylist=False, playlist_items=playlist_items, ignoreerrors=True)
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+            last_err = None
+        except yt_dlp.utils.DownloadCancelled:
+            raise
+        except Exception as ex:
+            last_err = ex
+            continue
+        if glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}*.srt")):
+            return info
+    if last_err:
+        raise last_err
+    return info
+
 def safe_name(s):
     return re.sub(r'[\\/:*?"<>|]', "_", s or "download").strip()[:80] or "download"
 
@@ -119,7 +161,7 @@ def resolve_range(total, start, end):
         raise ValueError(f"You can download at most {MAX_PLAYLIST_SIZE} videos at a time. Please choose a smaller range.")
     return start, end
 
-def run_download_job(job_id, url, media_type, quality, start, end):
+def run_download_job(job_id, url, media_type, quality, start, end, subs=""):
     try:
         set_job(job_id, status="downloading", percent=0, detail="Checking link...")
         probe_opts = dict(BASE_OPTS, noplaylist=False, extract_flat=True)
@@ -130,9 +172,9 @@ def run_download_job(job_id, url, media_type, quality, start, end):
             entries = [e for e in info["entries"] if e]
             total = info.get("playlist_count") or len(entries)
             s, e = resolve_range(total, start, end)
-            run_playlist_download_job(job_id, url, media_type, quality, info.get("title"), s, e)
+            run_playlist_download_job(job_id, url, media_type, quality, info.get("title"), s, e, subs)
         else:
-            run_single_download_job(job_id, url, media_type, quality)
+            run_single_download_job(job_id, url, media_type, quality, subs)
     except yt_dlp.utils.DownloadCancelled:
         remove_job_files(job_id)
         set_job(job_id, status="cancelled", detail="Cancelled")
@@ -145,7 +187,7 @@ def run_download_job(job_id, url, media_type, quality, start, end):
         else:
             set_job(job_id, status="error", error=friendly_error_message(str(ex)))
 
-def run_single_download_job(job_id, url, media_type, quality):
+def run_single_download_job(job_id, url, media_type, quality, subs=""):
     def hook(d):
         check_cancel(job_id)
         if d["status"] == "downloading":
@@ -158,21 +200,55 @@ def run_single_download_job(job_id, url, media_type, quality):
                 format=build_format(media_type, quality),
                 outtmpl=os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s"),
                 progress_hooks=[hook])
-    if media_type == "mp3":
-        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
-    else:
-        opts["merge_output_format"] = "mp4"
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        title = safe_name(info.get("title"))
-    files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
-    if not files:
+    apply_media_opts(opts, media_type, subs)
+    title = "download"
+    if media_type != "srt":
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            title = safe_name(info.get("title"))
+    if subs or media_type == "srt":
+        lang = subs or "en"
+        set_job(job_id, status="processing", percent=100, detail="Fetching subtitles...")
+        try:
+            sinfo = download_subs(url, os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s"), lang, job_id)
+            if media_type == "srt":
+                title = safe_name(sinfo.get("title"))
+        except Exception:
+            if media_type == "srt":
+                raise
+    files = [f for f in glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*")) if not f.endswith(".zip")]
+    sub_files = [f for f in files if f.endswith(".srt")]
+    media_files = [f for f in files if f not in sub_files and not f.endswith((".part", ".ytdl", ".vtt"))]
+    note = ""
+    if (subs or media_type == "srt") and not sub_files:
+        note = "No subtitles are available for this video."
+    if media_type == "srt":
+        if not sub_files:
+            raise Exception("No subtitles are available for this video.")
+        path = sub_files[0]
+        set_job(job_id, status="finished", percent=100, file_path=path,
+                download_name=f"{title}{path[len(os.path.join(DOWNLOAD_DIR, job_id)):]}", detail="", note="")
+        return
+    if not media_files:
         raise Exception("download failed")
-    path = files[0]
-    ext = os.path.splitext(path)[1]
-    set_job(job_id, status="finished", percent=100, file_path=path, download_name=f"{title}{ext}", detail="")
+    media = media_files[0]
+    ext = os.path.splitext(media)[1]
+    if sub_files:
+        zip_path = os.path.join(DOWNLOAD_DIR, f"{job_id}.zip")
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
+            z.write(media, arcname=f"{title}{ext}")
+            for sf in sub_files:
+                z.write(sf, arcname=f"{title}{sf[len(os.path.join(DOWNLOAD_DIR, job_id)):]}")
+        for f in files:
+            try: os.remove(f)
+            except OSError: pass
+        set_job(job_id, status="finished", percent=100, file_path=zip_path,
+                download_name=f"{title}.zip", detail="", note="")
+    else:
+        set_job(job_id, status="finished", percent=100, file_path=media,
+                download_name=f"{title}{ext}", detail="", note=note)
 
-def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, start, end):
+def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, start, end, subs=""):
     batch = end - start + 1
     def hook(d):
         check_cancel(job_id)
@@ -192,22 +268,27 @@ def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, 
                 outtmpl=os.path.join(DOWNLOAD_DIR, f"{job_id}_%(playlist_index)s - %(title)s.%(ext)s"),
                 progress_hooks=[hook],
                 ignoreerrors=True)
-    if media_type == "mp3":
-        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
-    else:
-        opts["merge_output_format"] = "mp4"
+    apply_media_opts(opts, media_type, subs)
     stopped = False
     try:
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.extract_info(url, download=True)
+        if media_type != "srt":
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                ydl.extract_info(url, download=True)
     except yt_dlp.utils.DownloadCancelled:
         stopped = True
+    if (subs or media_type == "srt") and not stopped:
+        set_job(job_id, detail="Fetching subtitles...")
+        try:
+            download_subs(url, os.path.join(DOWNLOAD_DIR, f"{job_id}_%(playlist_index)s - %(title)s.%(ext)s"),
+                          subs or "en", job_id, f"{start}-{end}")
+        except Exception:
+            pass
     with jobs_lock:
         discard = bool(jobs.get(job_id, {}).get("discard"))
     if stopped and discard:
         raise yt_dlp.utils.DownloadCancelled("cancelled")
     # keep only fully finished files (skip .part, fragments like .f137.mp4, temp files)
-    bad = re.compile(r"(\.part|\.ytdl|\.temp|\.f\d+(-\w+)?\.\w+|\.zip)$", re.I)
+    bad = re.compile(r"(\.part|\.ytdl|\.temp|\.vtt|\.f\d+(-\w+)?\.\w+|\.zip)$", re.I)
     files = [f for f in sorted(glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}_*"))) if not bad.search(f)]
     if not files:
         if stopped:
@@ -265,9 +346,12 @@ def start_download():
     media_type = data.get("type", "mp4")
     quality = data.get("quality", "best")
     start, end = data.get("start"), data.get("end")
+    subs = data.get("subs", "")
+    if subs not in SUB_LANGS:
+        subs = ""
     job_id = uuid.uuid4().hex
     set_job(job_id, status="downloading", percent=0, detail="Starting...")
-    threading.Thread(target=run_download_job, args=(job_id, url, media_type, quality, start, end), daemon=True).start()
+    threading.Thread(target=run_download_job, args=(job_id, url, media_type, quality, start, end, subs), daemon=True).start()
     return jsonify({"job_id": job_id})
 
 @app.route("/api/cancel/<job_id>", methods=["POST"])
@@ -290,7 +374,8 @@ def progress(job_id):
         if j.get("status") == "cancelled":
             return jsonify({"status": "cancelled", "percent": 0, "error": None, "detail": "Cancelled"})
         return jsonify({"status": j.get("status"), "percent": j.get("percent", 0),
-                        "error": j.get("error"), "detail": j.get("detail", "")})
+                        "error": j.get("error"), "detail": j.get("detail", ""),
+                        "note": j.get("note", "")})
 
 @app.route("/api/fetch/<job_id>")
 def fetch(job_id):
