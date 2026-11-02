@@ -18,6 +18,22 @@ BASE_OPTS = {
     "quiet": True,
 }
 
+# ---- optional YouTube cookies (free fix for "Sign in to confirm you're not a bot") ----
+# Put the cookies.txt content, base64-encoded, in the environment variable YT_COOKIES_B64
+# (never commit the cookies file to GitHub).
+import base64
+COOKIE_PATH = "/tmp/yt_cookies.txt" if os.name != "nt" else os.path.join(os.environ.get("TEMP", "."), "yt_cookies.txt")
+_b64 = os.environ.get("YT_COOKIES_B64", "").strip()
+if _b64:
+    try:
+        with open(COOKIE_PATH, "wb") as _f:
+            _f.write(base64.b64decode(_b64))
+        BASE_OPTS["cookiefile"] = COOKIE_PATH
+        # the android client ignores cookies, so use yt-dlp's default clients when cookies are set
+        BASE_OPTS.pop("extractor_args", None)
+    except Exception as _e:
+        print("Could not load YT_COOKIES_B64:", _e)
+
 # ---- simple rate limit: 5 requests / 60 s per IP ----
 hits = defaultdict(list)
 def is_rate_limited(ip, limit=5, window=60):
@@ -70,6 +86,8 @@ threading.Thread(target=janitor, daemon=True).start()
 
 def friendly_error_message(raw):
     r = (raw or "").lower()
+    if "not a bot" in r or "confirm you" in r:
+        return "YouTube is temporarily blocking this server, so this link cannot be downloaded right now. Please try again later or try a link from another site."
     if "no subtitles" in r:
         return "No subtitles are available for this video."
     if "private" in r:
