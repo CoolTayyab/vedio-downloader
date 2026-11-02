@@ -3,88 +3,454 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Free Online Video Downloader - MP4 & MP3</title>
-<meta name="description" content="Download videos and playlists as MP4 or MP3 for free. Paste a link, choose quality, and download.">
+<title>Tayyab's Downloader - Free Online Video Downloader (MP4, MP3, Subtitles)</title>
+<meta name="description" content="Tayyab's Downloader: free online video downloader. Paste a public link, choose MP4, MP3 or subtitles, and download. Playlist support, live progress and download history.">
 <style>
+  :root{
+    --c1:#7c5cff; --c2:#22d3ee; --ink:#f1f2f6; --mute:#a3a9c0;
+    --panel:rgba(14,17,36,.74); --line:rgba(255,255,255,.12);
+  }
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;color:#f1f2f6;
-    background:#0f1224 url('/static/background.jpg') center/cover fixed no-repeat;display:flex;align-items:center;justify-content:center;padding:20px}
-  .card{width:100%;max-width:560px;background:rgba(15,18,36,.82);backdrop-filter:blur(8px);border-radius:18px;padding:28px;box-shadow:0 10px 40px rgba(0,0,0,.45)}
-  h1{margin:0 0 6px;font-size:1.6rem;background:linear-gradient(90deg,#7c5cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
-  p.sub{margin:0 0 18px;color:#9aa0b4;font-size:.9rem}
-  input,select{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:#0f1224;color:#f1f2f6;font-size:.95rem}
-  label{display:block;font-size:.8rem;color:#9aa0b4;margin:12px 0 6px}
-  .row{display:flex;gap:12px}.row>div{flex:1}
-  button{width:100%;margin-top:18px;padding:14px;border:none;border-radius:10px;font-weight:600;font-size:1rem;color:#0f1224;background:linear-gradient(90deg,#22d3ee,#7c5cff);cursor:pointer}
-  button:disabled{opacity:.6;cursor:not-allowed}
-  #preview-box{display:none;margin-top:14px;gap:12px;align-items:center;background:rgba(255,255,255,.06);border-radius:10px;padding:10px}
-  #preview-thumb{width:96px;height:60px;object-fit:cover;border-radius:6px;background:#222}
-  #preview-title{font-weight:600;font-size:.9rem}
-  #preview-meta{font-size:.78rem;color:#9aa0b4;margin-top:3px}
-  #preview-loading{display:none;margin-top:12px;font-size:.85rem;color:#9aa0b4}
-  #preview-error{display:none;margin-top:12px;font-size:.85rem;color:#ff6b6b}
-  #range-box{display:none;margin-top:6px;padding:12px;border-radius:10px;background:rgba(124,92,255,.12);border:1px solid rgba(124,92,255,.35)}
-  #range-box .hint{font-size:.78rem;color:#9aa0b4;margin-top:8px}
-  #progress-wrap{display:none;margin-top:18px}
-  #progress-track{height:10px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden}
-  #progress-fill{height:100%;width:0;background:linear-gradient(90deg,#22d3ee,#7c5cff);transition:width .3s}
-  #progress-label{font-size:.82rem;color:#9aa0b4;margin-top:6px}
-  #status{margin-top:12px;font-size:.88rem;min-height:1.2em}
-  #status.err{color:#ff6b6b}#status.ok{color:#4ade80}
+  html{scroll-behavior:smooth}
+  body{margin:0;min-height:100vh;font-family:'Segoe UI',system-ui,Arial,sans-serif;color:var(--ink);background:#0b0d1f;line-height:1.5}
+
+  /* ---------- 4-photo background ---------- */
+  .bg{position:fixed;inset:0;z-index:-2;display:grid;grid-template-columns:repeat(4,1fr)}
+  .bg div{background-size:cover;background-position:center top}
+  .bg-overlay{position:fixed;inset:0;z-index:-1;
+    background:linear-gradient(180deg,rgba(9,11,28,.55) 0%,rgba(9,11,28,.78) 55%,rgba(9,11,28,.92) 100%)}
+  @media (max-width:700px){ .bg{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr} }
+
+  /* ---------- top bar ---------- */
+  header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:12px clamp(14px,4vw,34px);background:rgba(10,12,28,.62);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:#fff;font-weight:800;font-size:clamp(1.05rem,3.4vw,1.45rem);letter-spacing:.3px;
+    animation:neon 2.8s ease-in-out infinite}
+  .brand .logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:1.1rem;color:#0b0d1f;
+    background:linear-gradient(135deg,var(--c2),var(--c1));box-shadow:0 0 14px rgba(34,211,238,.7)}
+  @keyframes neon{
+    0%,100%{text-shadow:0 0 6px rgba(34,211,238,.9),0 0 16px rgba(34,211,238,.55),0 0 30px rgba(124,92,255,.45)}
+    50%{text-shadow:0 0 8px rgba(124,92,255,1),0 0 22px rgba(124,92,255,.7),0 0 42px rgba(34,211,238,.5)}
+  }
+  .top-actions{display:flex;gap:10px;align-items:center}
+
+  /* ---------- buttons with glow ---------- */
+  .btn{appearance:none;border:1px solid var(--line);cursor:pointer;font:inherit;font-weight:600;color:var(--ink);
+    background:rgba(255,255,255,.07);padding:9px 16px;border-radius:12px;transition:.22s;display:inline-flex;align-items:center;gap:8px}
+  .btn:hover,.btn:focus-visible{outline:none;transform:translateY(-1px);border-color:rgba(34,211,238,.7);
+    box-shadow:0 0 14px rgba(34,211,238,.55),0 0 32px rgba(124,92,255,.35)}
+  .btn:active{transform:translateY(0)}
+  .btn.primary{border:none;color:#0b0d1f;background:linear-gradient(90deg,var(--c2),var(--c1))}
+  .btn.primary:hover,.btn.primary:focus-visible{box-shadow:0 0 18px rgba(34,211,238,.85),0 0 42px rgba(124,92,255,.7)}
+  .btn.danger{border:none;color:#fff;background:linear-gradient(90deg,#ff5d5d,#ff3d81)}
+  .btn.danger:hover{box-shadow:0 0 18px rgba(255,93,93,.85),0 0 40px rgba(255,61,129,.55)}
+  .btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
+  .btn.big{width:100%;justify-content:center;padding:16px;font-size:1.1rem;border-radius:14px}
+  .avatar{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:800;color:#0b0d1f;background:linear-gradient(135deg,var(--c2),var(--c1))}
+  @media (max-width:560px){ #btn-history .lbl{display:none} #acc-label{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} }
+
+  /* ---------- layout ---------- */
+  main{max-width:900px;margin:0 auto;padding:0 clamp(14px,4vw,24px) 40px}
+  .hero{text-align:center;padding:42px 0 26px}
+  .hero h1{margin:0 0 10px;font-size:clamp(1.7rem,5.5vw,2.8rem);line-height:1.15;
+    background:linear-gradient(90deg,#fff,var(--c2) 50%,var(--c1));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{margin:0 auto;max-width:620px;color:#c9cde0;font-size:clamp(.95rem,2.6vw,1.1rem)}
+
+  .panel{background:var(--panel);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px;
+    box-shadow:0 10px 36px rgba(0,0,0,.35);transition:border-color .25s,box-shadow .25s}
+  .panel:hover{border-color:rgba(124,92,255,.5);box-shadow:0 10px 36px rgba(0,0,0,.35),0 0 26px rgba(124,92,255,.22)}
+  .step-title{display:flex;align-items:center;gap:10px;margin:0 0 12px;font-size:1rem;font-weight:700;color:#e8eaf6}
+  .step-title span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:.8rem;color:#0b0d1f;background:linear-gradient(135deg,var(--c2),var(--c1))}
+
+  input,select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:rgba(8,10,26,.85);color:var(--ink);font:inherit;transition:.2s}
+  input:focus,select:focus{outline:none;border-color:var(--c2);box-shadow:0 0 0 3px rgba(34,211,238,.18),0 0 18px rgba(34,211,238,.35)}
+  select:disabled{opacity:.5}
+  .link-row{display:flex;gap:10px}
+  .link-row input{flex:1}
+  .opts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .opt{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:12px;transition:.2s}
+  .opt:hover{border-color:rgba(34,211,238,.5);box-shadow:0 0 16px rgba(34,211,238,.22)}
+  .opt label{display:block;font-size:.8rem;color:var(--mute);margin-bottom:8px}
+  @media (max-width:640px){ .opts{grid-template-columns:1fr} .link-row{flex-direction:column} }
+
+  #preview-loading{display:none;margin:-6px 4px 14px;font-size:.88rem;color:var(--mute)}
+  #preview-error{display:none;margin:-6px 4px 14px;font-size:.88rem;color:#ff7b7b}
+  #preview-box{display:none;gap:14px;align-items:center}
+  #preview-thumb{width:140px;height:84px;object-fit:cover;border-radius:10px;background:#1b1f38;flex:none}
+  #preview-title{font-weight:700}
+  #preview-meta{font-size:.82rem;color:var(--mute);margin-top:4px}
+  #range-box{display:none}
+  #range-box .rr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  #range-box label{display:block;font-size:.8rem;color:var(--mute);margin-bottom:6px}
+  #range-box .hint{font-size:.8rem;color:var(--mute);margin-top:10px}
+
+  #progress-wrap{display:none;margin-top:16px}
+  #progress-track{height:12px;border-radius:8px;background:rgba(255,255,255,.12);overflow:hidden}
+  #progress-fill{height:100%;width:0;background:linear-gradient(90deg,var(--c2),var(--c1));box-shadow:0 0 14px rgba(34,211,238,.7);transition:width .3s}
+  #progress-label{font-size:.84rem;color:var(--mute);margin-top:8px}
+  #status{margin-top:12px;font-size:.92rem;min-height:1.2em}
+  #status.err{color:#ff7b7b} #status.ok{color:#4ade80}
+  #cancel-btn{display:none;margin-top:12px;width:100%;justify-content:center}
+
+  /* ---------- sections ---------- */
+  section.block{margin-top:46px}
+  section.block h2{text-align:center;margin:0 0 6px;font-size:clamp(1.3rem,4vw,1.8rem)}
+  section.block .lead{text-align:center;color:var(--mute);margin:0 auto 22px;max-width:640px}
+  .grid{display:grid;gap:14px}
+  .g-plat{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .g-feat{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+  .g-steps{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .tile{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px);transition:.22s}
+  .tile:hover{transform:translateY(-3px);border-color:rgba(34,211,238,.6);box-shadow:0 0 20px rgba(34,211,238,.35),0 0 40px rgba(124,92,255,.2)}
+  .badge{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;color:#fff;flex:none;font-size:1.05rem}
+  .card2{padding:18px;border-radius:18px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(8px);transition:.22s}
+  .card2:hover{transform:translateY(-3px);border-color:rgba(124,92,255,.6);box-shadow:0 0 24px rgba(124,92,255,.35)}
+  .card2 .ico{font-size:1.6rem}
+  .card2 h3{margin:8px 0 6px;font-size:1.05rem}
+  .card2 p{margin:0;color:#c0c5db;font-size:.92rem}
+  .num{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#0b0d1f;background:linear-gradient(135deg,var(--c2),var(--c1));box-shadow:0 0 14px rgba(34,211,238,.6)}
+  .note{margin-top:14px;text-align:center;font-size:.82rem;color:var(--mute)}
+
+  footer{border-top:1px solid var(--line);background:rgba(8,10,24,.8);backdrop-filter:blur(10px);padding:28px clamp(14px,4vw,34px) 34px;text-align:center}
+  footer .apps{max-width:860px;margin:10px auto 14px;color:#c0c5db;font-size:.9rem}
+  footer .links a{color:var(--c2);text-decoration:none;margin:0 10px}
+  footer .links a:hover{text-shadow:0 0 12px rgba(34,211,238,.9)}
+  footer small{display:block;max-width:760px;margin:14px auto 0;color:var(--mute);font-size:.78rem}
+
+  /* ---------- modals ---------- */
+  .modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(5,6,18,.72);backdrop-filter:blur(6px)}
+  .modal.open{display:flex}
+  .dialog{width:100%;max-width:520px;max-height:88vh;overflow:auto;background:#12152b;border:1px solid rgba(124,92,255,.5);border-radius:22px;padding:24px;
+    box-shadow:0 0 40px rgba(124,92,255,.35),0 20px 60px rgba(0,0,0,.6);animation:pop .22s ease}
+  .dialog.wide{max-width:680px}
+  @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}
+  .dialog h2{margin:0 0 6px;font-size:1.35rem;background:linear-gradient(90deg,var(--c2),var(--c1));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .dialog p.sub{margin:0 0 16px;color:var(--mute);font-size:.9rem}
+  .dialog label{display:block;font-size:.8rem;color:var(--mute);margin:12px 0 6px}
+  .dlg-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .x{background:none;border:none;color:var(--mute);font-size:1.5rem;cursor:pointer;line-height:1;padding:2px 8px;border-radius:8px}
+  .x:hover{color:#fff;text-shadow:0 0 12px #fff}
+  .row-btns{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+  .stat{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .stat b{display:block;font-size:1.15rem}
+  .stat small{color:var(--mute)}
+  .tips{margin:14px 0 0;padding-left:18px;color:#c0c5db;font-size:.88rem}
+  .hist-item{display:flex;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;background:rgba(255,255,255,.04)}
+  .hist-item img,.hist-item .noimg{width:84px;height:52px;object-fit:cover;border-radius:8px;background:#1d2140;flex:none}
+  .hist-item .t{font-weight:600;font-size:.92rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .hist-item .m{font-size:.76rem;color:var(--mute);margin-top:2px}
+  .hist-item .btn{padding:6px 10px;font-size:.8rem;flex:none}
+  .empty{text-align:center;color:var(--mute);padding:26px 0}
 </style>
 </head>
 <body>
-<div class="card">
-  <h1>Video Downloader</h1>
-  <p class="sub">Paste a link, pick a format, and download. Playlists are supported (up to 25 videos per batch).</p>
 
-  <input id="url" type="text" placeholder="Paste video or playlist link here..." autocomplete="off">
+<div class="bg" aria-hidden="true">
+  <div style="background-image:url('/static/cat1.jpg')"></div>
+  <div style="background-image:url('/static/cat2.jpg')"></div>
+  <div style="background-image:url('/static/cat3.jpg')"></div>
+  <div style="background-image:url('/static/cat4.jpg')"></div>
+</div>
+<div class="bg-overlay" aria-hidden="true"></div>
 
-  <div id="preview-loading">Loading preview...</div>
-  <div id="preview-error"></div>
-  <div id="preview-box">
-    <img id="preview-thumb" alt="">
-    <div><div id="preview-title"></div><div id="preview-meta"></div></div>
+<header class="top">
+  <a class="brand" href="/"><span class="logo">&#11015;</span>Tayyab's Downloader</a>
+  <div class="top-actions">
+    <button class="btn" id="btn-history" type="button">&#128193;<span class="lbl"> All downloads</span></button>
+    <button class="btn" id="btn-account" type="button"><span class="avatar" id="acc-avatar">+</span><span id="acc-label">Sign up</span></button>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Download videos, music &amp; subtitles &mdash; free</h1>
+    <p>Paste a public link, pick your format, and save it to your device. No installs, no password.</p>
   </div>
 
-  <div id="range-box">
-    <div class="row">
-      <div><label style="margin-top:0">From video #</label><input id="range-start" type="number" min="1" value="1"></div>
-      <div><label style="margin-top:0">To video #</label><input id="range-end" type="number" min="1" value="25"></div>
+  <div id="downloader">
+    <div class="panel">
+      <h3 class="step-title"><span>1</span> Paste your link</h3>
+      <div class="link-row">
+        <input id="url" type="text" placeholder="https://... paste a video or playlist link" autocomplete="off">
+        <button class="btn" id="paste-btn" type="button">&#128203; Paste</button>
+      </div>
     </div>
-    <div class="hint" id="range-hint"></div>
+
+    <div id="preview-loading">Loading preview...</div>
+    <div id="preview-error"></div>
+
+    <div class="panel" id="preview-box">
+      <img id="preview-thumb" alt="">
+      <div><div id="preview-title"></div><div id="preview-meta"></div></div>
+    </div>
+
+    <div class="panel" id="range-box">
+      <h3 class="step-title"><span>&#9776;</span> Choose playlist range</h3>
+      <div class="rr">
+        <div><label for="range-start">From video #</label><input id="range-start" type="number" min="1" value="1"></div>
+        <div><label for="range-end">To video #</label><input id="range-end" type="number" min="1" value="25"></div>
+      </div>
+      <div class="hint" id="range-hint"></div>
+    </div>
+
+    <div class="panel">
+      <h3 class="step-title"><span>2</span> Choose your options</h3>
+      <div class="opts">
+        <div class="opt"><label for="type">&#127902; Format</label>
+          <select id="type"><option value="mp4">MP4 (video)</option><option value="mp3">MP3 (audio)</option><option value="srt">Subtitles only (SRT)</option></select></div>
+        <div class="opt"><label for="quality">&#127910; Quality</label>
+          <select id="quality"><option value="best">Best</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option><option value="360p">360p</option></select></div>
+        <div class="opt"><label for="subs">&#128172; Subtitles</label>
+          <select id="subs">
+            <option value="">No subtitles</option>
+            <option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option>
+            <option value="ar">Arabic</option><option value="es">Spanish</option><option value="fr">French</option>
+            <option value="de">German</option><option value="pt">Portuguese</option><option value="ru">Russian</option>
+            <option value="tr">Turkish</option><option value="id">Indonesian</option><option value="bn">Bengali</option>
+          </select></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="step-title"><span>3</span> Download</h3>
+      <button class="btn primary big" id="dl-btn" type="button">&#11015; Download</button>
+      <button class="btn danger" id="cancel-btn" type="button">&#9632; Stop &amp; save finished videos</button>
+      <div id="progress-wrap">
+        <div id="progress-track"><div id="progress-fill"></div></div>
+        <div id="progress-label"></div>
+      </div>
+      <div id="status"></div>
+    </div>
   </div>
 
-  <div class="row">
-    <div><label>Format</label>
-      <select id="type"><option value="mp4">MP4 (video)</option><option value="mp3">MP3 (audio)</option><option value="srt">Subtitles only (SRT)</option></select></div>
-    <div><label>Quality</label>
-      <select id="quality"><option value="best">Best</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option><option value="360p">360p</option></select></div>
+  <!-- ===== supported platforms ===== -->
+  <section class="block" id="platforms">
+    <h2>Works with your favourite apps</h2>
+    <p class="lead">Paste a public link from any of these sites and download it in seconds.</p>
+    <div class="grid g-plat" id="plat-grid"></div>
+    <p class="note">...and many more public video sites. Availability can change, and private or login-only videos are not supported.</p>
+  </section>
+
+  <!-- ===== how to use ===== -->
+  <section class="block" id="how">
+    <h2>How to use Tayyab's Downloader</h2>
+    <p class="lead">Four quick steps. No account needed.</p>
+    <div class="grid g-steps">
+      <div class="card2"><div class="num">1</div><h3>Copy the link</h3><p>Open the video in its app or website and copy the link from the address bar or the Share button.</p></div>
+      <div class="card2"><div class="num">2</div><h3>Paste it here</h3><p>Paste it in the link box. A preview with the title and thumbnail appears so you know it's the right video.</p></div>
+      <div class="card2"><div class="num">3</div><h3>Pick your options</h3><p>Choose MP4 video, MP3 audio or subtitles, then the quality and subtitle language you want.</p></div>
+      <div class="card2"><div class="num">4</div><h3>Download</h3><p>Press Download and watch the live progress. The file is saved to your device's Downloads folder.</p></div>
+    </div>
+  </section>
+
+  <!-- ===== what you can do ===== -->
+  <section class="block" id="features">
+    <h2>What you can do</h2>
+    <p class="lead">Everything is simple and runs in your browser. Here's what's included.</p>
+    <div class="grid g-feat">
+      <div class="card2"><div class="ico">&#127910;</div><h3>MP4 video</h3><p>Save videos in the best available quality, or choose 1080p, 720p, 480p or 360p to save space.</p></div>
+      <div class="card2"><div class="ico">&#127925;</div><h3>MP3 audio</h3><p>Turn a video into an MP3 so you can listen to songs, lectures and podcasts offline.</p></div>
+      <div class="card2"><div class="ico">&#128172;</div><h3>Subtitles (SRT)</h3><p>Get subtitles in 12 languages, together with the video or on their own, when they are available.</p></div>
+      <div class="card2"><div class="ico">&#128221;</div><h3>Playlists</h3><p>Download up to 25 videos at a time as one ZIP, and pick any range such as 26&ndash;50 for big playlists.</p></div>
+      <div class="card2"><div class="ico">&#9889;</div><h3>Live progress &amp; stop</h3><p>See exactly how far along you are. Press Stop and the videos already finished are still saved for you.</p></div>
+      <div class="card2"><div class="ico">&#128193;</div><h3>Download history</h3><p>Open <b>All downloads</b> to see what you've downloaded before and reuse a link with one click.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <a class="brand" href="/" style="justify-content:center"><span class="logo">&#11015;</span>Tayyab's Downloader</a>
+  <div class="apps" id="footer-apps"></div>
+  <div class="links">
+    <a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a>
   </div>
+  <small>Free tool: paste a public video link, choose a format, and download. No password and no installs. Only download content you own or have permission to download.
+  All platform names belong to their respective owners; this site is not affiliated with or endorsed by them.</small>
+  <small>&copy; <span id="yr"></span> Tayyab's Downloader</small>
+</footer>
 
-  <label>Subtitles</label>
-  <select id="subs">
-    <option value="">No subtitles</option>
-    <option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option>
-    <option value="ar">Arabic</option><option value="es">Spanish</option><option value="fr">French</option>
-    <option value="de">German</option><option value="pt">Portuguese</option><option value="ru">Russian</option>
-    <option value="tr">Turkish</option><option value="id">Indonesian</option><option value="bn">Bengali</option>
-  </select>
-
-  <button id="dl-btn">Download</button>
-  <button id="cancel-btn" style="display:none;background:#ff5d5d;color:#fff">Stop &amp; save finished videos</button>
-
-  <div id="progress-wrap">
-    <div id="progress-track"><div id="progress-fill"></div></div>
-    <div id="progress-label"></div>
+<!-- ===== sign up modal (first visit) ===== -->
+<div class="modal" id="modal-signup" role="dialog" aria-modal="true" aria-labelledby="su-title">
+  <div class="dialog">
+    <div class="dlg-head"><div><h2 id="su-title">Welcome to Tayyab's Downloader</h2>
+      <p class="sub">Create a quick profile so we can greet you and keep your download history. No password needed.</p></div>
+      <button class="x" data-close aria-label="Close" type="button">&times;</button></div>
+    <form id="signup-form">
+      <label for="su-name">Your name</label>
+      <input id="su-name" maxlength="40" required placeholder="e.g. Tayyab" autocomplete="name">
+      <label for="su-email">Email (optional)</label>
+      <input id="su-email" type="email" maxlength="80" placeholder="you@example.com" autocomplete="email">
+      <p class="sub" style="margin-top:12px">Your profile and history are saved <b>only in this browser</b>. Nothing is sent to our server.</p>
+      <div class="row-btns">
+        <button class="btn primary" type="submit">Create profile</button>
+        <button class="btn" type="button" id="su-skip">Skip for now</button>
+      </div>
+    </form>
   </div>
-  <div id="status"></div>
+</div>
+
+<!-- ===== profile / details modal ===== -->
+<div class="modal" id="modal-profile" role="dialog" aria-modal="true" aria-labelledby="pf-title">
+  <div class="dialog">
+    <div class="dlg-head"><div><h2 id="pf-title">Your details</h2>
+      <p class="sub">Saved only in this browser.</p></div>
+      <button class="x" data-close aria-label="Close" type="button">&times;</button></div>
+    <div class="stats">
+      <div class="stat"><b id="pf-count">0</b><small>Downloads</small></div>
+      <div class="stat"><b id="pf-joined">-</b><small>Member since</small></div>
+    </div>
+    <form id="profile-form">
+      <label for="pf-name">Name</label>
+      <input id="pf-name" maxlength="40" required>
+      <label for="pf-email">Email (optional)</label>
+      <input id="pf-email" type="email" maxlength="80">
+      <div class="row-btns">
+        <button class="btn primary" type="submit">Save</button>
+        <button class="btn" type="button" id="pf-history">&#128193; My downloads</button>
+        <button class="btn danger" type="button" id="pf-delete">Delete profile &amp; history</button>
+      </div>
+    </form>
+    <ul class="tips">
+      <li>Paste any public link, choose MP4, MP3 or subtitles, then press Download.</li>
+      <li>For big playlists, pick a range (25 videos per batch).</li>
+      <li>Press Stop any time &mdash; finished videos are still saved.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== history modal ===== -->
+<div class="modal" id="modal-history" role="dialog" aria-modal="true" aria-labelledby="hi-title">
+  <div class="dialog wide">
+    <div class="dlg-head"><div><h2 id="hi-title">All downloads</h2>
+      <p class="sub">Videos you've downloaded on this device (latest 50).</p></div>
+      <button class="x" data-close aria-label="Close" type="button">&times;</button></div>
+    <div id="hist-list"></div>
+    <div class="row-btns"><button class="btn" type="button" id="hist-clear">Clear history</button></div>
+  </div>
 </div>
 
 <script>
 const MAX_BATCH = 25;
 const $ = id => document.getElementById(id);
-let lastNote = "", currentJob = null, debounce, playlistCount = 0, isPlaylist = false;
+const PLATFORMS = [
+  ["YouTube","#e02424"],["Facebook","#2563eb"],["Instagram","#c026d3"],["TikTok","#0ea5a4"],
+  ["X (Twitter)","#334155"],["Vimeo","#0284c7"],["Dailymotion","#2563eb"],["Reddit","#ea580c"],
+  ["Pinterest","#dc2626"],["VK","#4f77b3"],["Twitch","#7c3aed"],["SoundCloud","#f97316"],
+  ["Bilibili","#0ea5e9"],["Rumble","#16a34a"]
+];
+
+/* ---------- safe localStorage helpers ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+
+/* ---------- platforms + footer ---------- */
+(function(){
+  const g = $("plat-grid");
+  PLATFORMS.forEach(([name,color])=>{
+    const t = document.createElement("div"); t.className="tile";
+    const b = document.createElement("div"); b.className="badge"; b.style.background=color; b.textContent=name.charAt(0);
+    const s = document.createElement("span"); s.textContent=name; s.style.fontWeight="600";
+    t.append(b,s); g.appendChild(t);
+  });
+  $("footer-apps").textContent = "Supported: " + PLATFORMS.map(p=>p[0]).join(" · ") + " and more";
+  $("yr").textContent = new Date().getFullYear();
+})();
+
+/* ---------- modals ---------- */
+function openModal(id){ $(id).classList.add("open"); const f=$(id).querySelector("input"); if(f) setTimeout(()=>f.focus(),50); }
+function closeModals(){ document.querySelectorAll(".modal.open").forEach(m=>m.classList.remove("open")); }
+document.querySelectorAll(".modal").forEach(m=>{
+  m.addEventListener("click",e=>{ if(e.target===m) closeModals(); });
+  m.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",closeModals));
+});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModals(); });
+
+/* ---------- profile ---------- */
+function getProfile(){ return store.get("td_profile", null); }
+function refreshAccountButton(){
+  const p = getProfile();
+  $("acc-avatar").textContent = p ? (p.name.trim().charAt(0).toUpperCase() || "?") : "+";
+  $("acc-label").textContent = p ? p.name : "Sign up";
+}
+function fillProfileModal(){
+  const p = getProfile(); if(!p) return;
+  $("pf-name").value = p.name; $("pf-email").value = p.email || "";
+  $("pf-count").textContent = store.get("td_count", 0);
+  $("pf-joined").textContent = new Date(p.joined).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"});
+}
+$("signup-form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const name = $("su-name").value.trim(); if(!name) return;
+  store.set("td_profile",{name, email:$("su-email").value.trim(), joined:Date.now()});
+  store.set("td_signup_seen", true);
+  refreshAccountButton(); closeModals();
+});
+$("su-skip").addEventListener("click",()=>{ store.set("td_signup_seen", true); closeModals(); });
+$("btn-account").addEventListener("click",()=>{
+  if(getProfile()){ fillProfileModal(); openModal("modal-profile"); } else { openModal("modal-signup"); }
+});
+$("profile-form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const p = getProfile(); if(!p) return;
+  p.name = $("pf-name").value.trim() || p.name; p.email = $("pf-email").value.trim();
+  store.set("td_profile", p); refreshAccountButton(); closeModals();
+});
+$("pf-delete").addEventListener("click",()=>{
+  if(!confirm("Delete your profile and download history from this browser?")) return;
+  ["td_profile","td_history","td_count"].forEach(store.del); refreshAccountButton(); closeModals();
+});
+$("pf-history").addEventListener("click",()=>{ closeModals(); showHistory(); });
+refreshAccountButton();
+if(!getProfile() && !store.get("td_signup_seen", false)) setTimeout(()=>openModal("modal-signup"), 700);
+
+/* ---------- download history ---------- */
+function addHistory(entry){
+  const list = store.get("td_history", []);
+  list.unshift(entry);
+  store.set("td_history", list.slice(0,50));
+  store.set("td_count", store.get("td_count", 0) + 1);
+}
+function showHistory(){
+  const list = store.get("td_history", []);
+  const box = $("hist-list"); box.textContent = "";
+  if(!list.length){
+    const e = document.createElement("div"); e.className="empty"; e.textContent="No downloads yet. Your downloaded videos will appear here."; box.appendChild(e);
+  }
+  list.forEach(it=>{
+    const row = document.createElement("div"); row.className="hist-item";
+    if(it.thumb && /^https?:\/\//i.test(it.thumb)){ const im=document.createElement("img"); im.src=it.thumb; im.alt=""; im.referrerPolicy="no-referrer"; row.appendChild(im); }
+    else { const n=document.createElement("div"); n.className="noimg"; row.appendChild(n); }
+    const mid = document.createElement("div"); mid.style.flex="1"; mid.style.minWidth="0";
+    const t = document.createElement("div"); t.className="t"; t.textContent = it.title || it.file || "Download";
+    const m = document.createElement("div"); m.className="m";
+    m.textContent = [String(it.type||"").toUpperCase(), it.type==="mp4"?it.quality:"", new Date(it.ts).toLocaleString()].filter(Boolean).join(" · ");
+    mid.append(t,m); row.appendChild(mid);
+    const b = document.createElement("button"); b.className="btn"; b.type="button"; b.textContent="Use again";
+    b.addEventListener("click",()=>{ $("url").value = it.url; closeModals(); $("url").dispatchEvent(new Event("input")); window.scrollTo({top:0,behavior:"smooth"}); });
+    row.appendChild(b); box.appendChild(row);
+  });
+  openModal("modal-history");
+}
+$("btn-history").addEventListener("click", showHistory);
+$("hist-clear").addEventListener("click",()=>{
+  if(!confirm("Clear your download history?")) return;
+  store.del("td_history"); store.del("td_count"); showHistory();
+});
+
+/* ---------- paste button ---------- */
+$("paste-btn").addEventListener("click", async ()=>{
+  try{
+    const t = await navigator.clipboard.readText();
+    if(t){ $("url").value = t.trim(); $("url").dispatchEvent(new Event("input")); }
+  }catch(e){ $("url").focus(); setStatus("Press Ctrl+V to paste your link.", ""); }
+});
+
+/* ---------- downloader logic ---------- */
+let lastNote = "", currentJob = null, debounce, playlistCount = 0, isPlaylist = false, lastPreview = null;
 
 function fmtDur(s){ if(!s) return ""; const m=Math.floor(s/60), r=s%60; return m+":"+String(r).padStart(2,"0"); }
 
@@ -107,7 +473,7 @@ $("range-end").addEventListener("input", updateRangeHint);
 
 async function fetchPreview(url){
   $("preview-box").style.display="none"; $("preview-error").style.display="none"; $("range-box").style.display="none";
-  isPlaylist=false; playlistCount=0;
+  isPlaylist=false; playlistCount=0; lastPreview=null;
   if(!/^https?:\/\//i.test(url)) return;
   $("preview-loading").style.display="block";
   try{
@@ -117,6 +483,7 @@ async function fetchPreview(url){
     if(!r.ok){ $("preview-error").textContent=data.error||"Could not load preview."; $("preview-error").style.display="block"; return; }
     $("preview-thumb").src = data.thumbnail || "";
     $("preview-title").textContent = data.title || "";
+    lastPreview = {url, title:data.title||"", thumb:data.thumbnail||""};
     if(data.type==="playlist"){
       isPlaylist=true; playlistCount=data.count;
       $("preview-meta").textContent = `Playlist • ${data.count} videos`;
@@ -169,7 +536,7 @@ async function downloadVideo(){
     const r=await fetch("/api/start-download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||"Could not start download");
-    currentJob = d.job_id; $("cancel-btn").style.display="block";
+    currentJob = d.job_id; $("cancel-btn").style.display="inline-flex";
     await pollProgress(d.job_id);
     $("cancel-btn").style.display="none"; currentJob=null;
     $("progress-label").textContent="Downloading file to your device...";
@@ -182,6 +549,8 @@ async function downloadVideo(){
     const blob=await f.blob();
     const a=document.createElement("a");
     a.href=URL.createObjectURL(blob); a.download=name; a.click();
+    const pv = (lastPreview && lastPreview.url===url) ? lastPreview : {};
+    addHistory({url, title:pv.title||name, thumb:pv.thumb||"", type:body.type, quality:body.quality, file:name, ts:Date.now()});
     setStatus("Done! Check your Downloads folder." + (lastNote ? " Note: "+lastNote : ""),"ok");
     $("progress-label").textContent="Complete";
   }catch(e){

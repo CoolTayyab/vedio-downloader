@@ -335,6 +335,51 @@ def run_playlist_download_job(job_id, url, media_type, quality, playlist_title, 
 def index():
     return render_template("index.html")
 
+# ---- simple info pages (About / Privacy / Terms / Contact) ----
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "your-email@example.com")  # set CONTACT_EMAIL on the host, or edit here
+
+PAGES = {
+    "about": ("About", """
+<p>This is a free online tool that lets you save videos and audio from public links as MP4, MP3 or subtitle (SRT) files.</p>
+<p>You paste a public link, choose a format and quality, and the file is prepared and sent to your browser's Downloads folder.</p>
+<p><strong>What this site does not do:</strong> it does not ask for passwords, payment details or personal information, it has no login, and it does not install any software on your device.</p>
+<p>Only download content you own or have permission to download.</p>"""),
+    "privacy": ("Privacy Policy", """
+<p>We do not require an account and we do not ask for your name, email or any personal information to use the tool.</p>
+<p><strong>Links you paste</strong> are sent to our server only to prepare your file. Prepared files are deleted automatically shortly after your download finishes (and in any case within about an hour).</p>
+<p><strong>Logs:</strong> like most servers, our hosting may keep technical logs such as IP address and request time for security and abuse prevention.</p>
+<p><strong>Cookies and advertising:</strong> this site does not currently set tracking cookies. If advertising is added in the future, this page will be updated to describe it.</p>
+<p>If you have questions, contact us at the email on the Contact page.</p>"""),
+    "terms": ("Terms of Use", """
+<p>By using this tool you agree to the following:</p>
+<ul>
+<li>Use it only for content you own, content that is in the public domain, or content you have permission to download.</li>
+<li>You are responsible for following the terms of the website you download from and the copyright laws of your country.</li>
+<li>Do not use the tool to harm, overload or abuse the service. Requests may be rate-limited.</li>
+<li>The service is provided "as is" without any guarantee that it will always be available or work for every link.</li>
+</ul>
+<p>We may block links or users at any time. We respect copyright; if you believe content is being misused, please contact us.</p>"""),
+    "contact": ("Contact", """
+<p>For questions, copyright concerns or feedback, email us at:</p>
+<p><strong>{email}</strong></p>"""),
+}
+
+PAGE_TEMPLATE = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>{title} - Video Downloader</title>
+<style>body{{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;color:#f1f2f6;background:#0f1224;padding:24px}}
+.box{{max-width:720px;margin:0 auto;background:#171b2e;border-radius:16px;padding:28px;line-height:1.6}}
+h1{{margin-top:0;background:linear-gradient(90deg,#7c5cff,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}}
+a{{color:#22d3ee}}nav{{margin-top:22px;font-size:.9rem}}nav a{{margin-right:14px}}</style></head><body>
+<div class="box"><h1>{title}</h1>{body}
+<nav><a href="/">Home</a><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/contact">Contact</a></nav></div></body></html>"""
+
+@app.route("/<page>")
+def info_page(page):
+    if page not in PAGES:
+        return jsonify({"error": "Not found"}), 404
+    title, body = PAGES[page]
+    return PAGE_TEMPLATE.format(title=title, body=body.replace("{email}", CONTACT_EMAIL)), 200, {"Content-Type": "text/html; charset=utf-8"}
+
 # Google Search Console ownership verification (must be served at the site root)
 @app.route("/google7f332598abb08dc8.html")
 def google_verification():
