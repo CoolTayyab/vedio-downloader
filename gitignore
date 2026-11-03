@@ -1,0 +1,11 @@
+downloads/
+__pycache__/
+venv/
+.venv/
+*.pyc
+*.mp4
+*.mp3
+*.zip
+cookies.txt
+*cookies*.txt
+.env

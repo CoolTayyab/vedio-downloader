@@ -1,4 +1,4 @@
-flask
-flask-cors
+flask>=3,<4
+flask-cors>=4
 yt-dlp[default]
-gunicorn
+gunicorn>=22

@@ -1,18 +1,41 @@
 from flask import Flask, request, send_file, jsonify, render_template
 from flask_cors import CORS
 import yt_dlp
-import uuid, os, glob, time, threading, webbrowser, zipfile, re
+import uuid, os, glob, time, threading, webbrowser, zipfile, re, shutil, socket, ipaddress
+from urllib.parse import urlparse
 from collections import defaultdict
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
-CORS(app)
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024  # API requests are tiny; reject big bodies
+
+# Behind Railway/Back4app/Render the real client IP is in X-Forwarded-For.
+# Only trust it when TRUST_PROXY=1 (set in the Dockerfile), otherwise anyone could spoof it.
+if os.environ.get("TRUST_PROXY") == "1":
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# The web page uses same-origin requests (no CORS needed). Only the browser extension may call the API cross-origin.
+CORS(app, resources={r"/api/*": {"origins": [re.compile(r"^chrome-extension://[a-p]{32}$")]}})
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 MAX_PLAYLIST_SIZE = 25  # max videos per batch
 
+class QuietLogger:
+    """Keep server logs short: no download-progress spam, one trimmed line per error."""
+    def debug(self, msg): pass
+    def info(self, msg): pass
+    def warning(self, msg): pass
+    def error(self, msg):
+        print("[yt-dlp]", str(msg).replace("\n", " ")[:220], flush=True)
+
 BASE_OPTS = {
+    "logger": QuietLogger(),
+    "noprogress": True,
+    "socket_timeout": 30,
+    "max_filesize": 500 * 1024 * 1024,  # 500 MB per file
+
     "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     "noplaylist": True,
     "quiet": True,
@@ -40,15 +63,58 @@ if _b64:
     except Exception as _e:
         print("Could not load YT_COOKIES_B64:", _e)
 
-# ---- simple rate limit: 5 requests / 60 s per IP ----
+# ---- rate limits per IP and per kind of request ----
 hits = defaultdict(list)
-def is_rate_limited(ip, limit=5, window=60):
+hits_lock = threading.Lock()
+def is_rate_limited(ip, limit=5, window=60, bucket="download"):
     now = time.time()
-    hits[ip] = [t for t in hits[ip] if now - t < window]
-    if len(hits[ip]) >= limit:
+    key = (bucket, ip)
+    with hits_lock:
+        hits[key] = [t for t in hits[key] if now - t < window]
+        if len(hits[key]) >= limit:
+            return True
+        hits[key].append(now)
+        return False
+
+# ---- limits against overload ----
+MAX_ACTIVE_JOBS = int(os.environ.get("MAX_ACTIVE_JOBS", "3"))
+direct_slots = threading.BoundedSemaphore(MAX_ACTIVE_JOBS)  # for the extension's /download route
+MIN_FREE_DISK = 1024 * 1024 * 1024  # refuse new jobs when less than 1 GB is free
+
+ALLOWED_TYPES = {"mp4", "mp3", "srt"}
+ALLOWED_QUALITIES = {"best", "1080p", "720p", "480p", "360p"}
+JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+def server_busy():
+    """True when too many downloads are running or the disk is almost full."""
+    with jobs_lock:
+        active = sum(1 for j in jobs.values() if j.get("status") in ("downloading", "processing"))
+    if active >= MAX_ACTIVE_JOBS:
         return True
-    hits[ip].append(now)
-    return False
+    try:
+        return shutil.disk_usage(DOWNLOAD_DIR).free < MIN_FREE_DISK
+    except OSError:
+        return False
+
+def check_url(url):
+    """Return an error message if the URL is unsafe (not http/https, or points to a private/internal address)."""
+    if not url or len(url) > 2048:
+        return "Please paste a valid link."
+    try:
+        u = urlparse(url)
+    except ValueError:
+        return "Please paste a valid link."
+    if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password:
+        return "Please paste a valid http or https link."
+    try:
+        infos = socket.getaddrinfo(u.hostname, u.port or (443 if u.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except socket.gaierror:
+        return "This link's website could not be found. Please check the link."
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            return "This link is not allowed."
+    return None
 
 jobs = {}
 jobs_lock = threading.Lock()
@@ -87,6 +153,9 @@ def janitor():
         with jobs_lock:
             for jid in [j for j, v in jobs.items() if now - v.get("created", now) > 3600]:
                 jobs.pop(jid, None)
+        with hits_lock:
+            for k in [k for k, v in hits.items() if not v or now - v[-1] > 3600]:
+                hits.pop(k, None)
 
 threading.Thread(target=janitor, daemon=True).start()
 
@@ -342,10 +411,10 @@ PAGES = {
     "about": ("About", """
 <p>This is a free online tool that lets you save videos and audio from public links as MP4, MP3 or subtitle (SRT) files.</p>
 <p>You paste a public link, choose a format and quality, and the file is prepared and sent to your browser's Downloads folder.</p>
-<p><strong>What this site does not do:</strong> it does not ask for passwords, payment details or personal information, it has no login, and it does not install any software on your device.</p>
+<p><strong>What this site does not do:</strong> it does not ask for passwords or payment details, and it does not install any software on your device. You can optionally create a simple profile (a name and an optional email); it is saved only in your own browser and is not sent to our server.</p>
 <p>Only download content you own or have permission to download.</p>"""),
     "privacy": ("Privacy Policy", """
-<p>We do not require an account and we do not ask for your name, email or any personal information to use the tool.</p>
+<p>You do not need an account to use the tool. On your first visit you may create an optional profile (a name and an optional email) and the tool keeps a list of your recent downloads. <strong>Both are stored only in your own browser (local storage) on your device and are never sent to our server.</strong> You can delete them at any time from the profile window in the top-right corner, or by clearing your browser data.</p>
 <p><strong>Links you paste</strong> are sent to our server only to prepare your file. Prepared files are deleted automatically shortly after your download finishes (and in any case within about an hour).</p>
 <p><strong>Logs:</strong> like most servers, our hosting may keep technical logs such as IP address and request time for security and abuse prevention.</p>
 <p><strong>Cookies and advertising:</strong> this site does not currently set tracking cookies. If advertising is added in the future, this page will be updated to describe it.</p>
@@ -387,9 +456,14 @@ def google_verification():
 
 @app.route("/api/info", methods=["POST"])
 def api_info():
-    url = (request.get_json(silent=True) or {}).get("url", "").strip()
+    if is_rate_limited(request.remote_addr, limit=20, window=60, bucket="info"):
+        return jsonify({"error": "Too many requests. Please wait a minute."}), 429
+    url = str((request.get_json(silent=True) or {}).get("url", "")).strip()
     if not url:
         return jsonify({"error": "No URL"}), 400
+    bad = check_url(url)
+    if bad:
+        return jsonify({"error": bad}), 400
     try:
         opts = dict(BASE_OPTS, noplaylist=False, extract_flat=True)
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -412,18 +486,25 @@ def api_info():
 @app.route("/api/start-download", methods=["POST"])
 def start_download():
     ip = request.remote_addr
-    if is_rate_limited(ip):
+    if is_rate_limited(ip, bucket="start"):
         return jsonify({"error": "Too many requests. Please wait a minute."}), 429
     data = request.get_json(silent=True) or {}
-    url = data.get("url", "").strip()
+    url = str(data.get("url", "")).strip()
     if not url:
         return jsonify({"error": "No URL"}), 400
     media_type = data.get("type", "mp4")
     quality = data.get("quality", "best")
+    if media_type not in ALLOWED_TYPES or quality not in ALLOWED_QUALITIES:
+        return jsonify({"error": "Invalid options."}), 400
+    bad = check_url(url)
+    if bad:
+        return jsonify({"error": bad}), 400
     start, end = data.get("start"), data.get("end")
     subs = data.get("subs", "")
     if subs not in SUB_LANGS:
         subs = ""
+    if server_busy():
+        return jsonify({"error": "The server is busy right now. Please try again in a minute."}), 503
     job_id = uuid.uuid4().hex
     set_job(job_id, status="downloading", percent=0, detail="Starting...")
     threading.Thread(target=run_download_job, args=(job_id, url, media_type, quality, start, end, subs), daemon=True).start()
@@ -431,6 +512,8 @@ def start_download():
 
 @app.route("/api/cancel/<job_id>", methods=["POST"])
 def cancel(job_id):
+    if not JOB_ID_RE.match(job_id):
+        return jsonify({"ok": False}), 400
     discard = request.args.get("discard") == "1"
     with jobs_lock:
         j = jobs.get(job_id)
@@ -442,6 +525,8 @@ def cancel(job_id):
 
 @app.route("/api/progress/<job_id>")
 def progress(job_id):
+    if not JOB_ID_RE.match(job_id):
+        return jsonify({"status": "error", "error": "Unknown job"}), 404
     with jobs_lock:
         j = jobs.get(job_id)
         if not j:
@@ -454,6 +539,8 @@ def progress(job_id):
 
 @app.route("/api/fetch/<job_id>")
 def fetch(job_id):
+    if not JOB_ID_RE.match(job_id):
+        return jsonify({"error": "Not ready"}), 400
     with jobs_lock:
         j = jobs.get(job_id)
     if not j or j.get("status") != "finished":
@@ -473,38 +560,64 @@ def fetch(job_id):
 @app.route("/download")
 def download():
     ip = request.remote_addr
-    if is_rate_limited(ip):
+    if is_rate_limited(ip, bucket="direct"):
         return jsonify({"error": "Too many requests. Please wait a minute."}), 429
     url = request.args.get("url", "").strip()
     media_type = request.args.get("type", "mp4")
     quality = request.args.get("quality", "best")
     if not url:
         return jsonify({"error": "No URL"}), 400
+    bad = check_url(url)
+    if bad:
+        return jsonify({"error": bad}), 400
+    if media_type not in ("mp4", "mp3") or quality not in ALLOWED_QUALITIES:
+        return jsonify({"error": "Invalid options."}), 400
+    if not direct_slots.acquire(blocking=False) or server_busy():
+        try: direct_slots.release()
+        except ValueError: pass
+        return jsonify({"error": "The server is busy right now. Please try again in a minute."}), 503
     job_id = uuid.uuid4().hex
     try:
         opts = dict(BASE_OPTS, format=build_format(media_type, quality),
                     outtmpl=os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s"))
-        if media_type == "mp3":
-            opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}]
-        else:
-            opts["merge_output_format"] = "mp4"
+        apply_media_opts(opts, media_type)
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
         title = safe_name(info.get("title"))
-        path = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))[0]
-        ext = os.path.splitext(path)[1]
-        if ext.lower() not in ALLOWED_EXTS:
-            remove_job_files(job_id)
+        files = [f for f in glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
+                 if os.path.splitext(f)[1].lower() in ALLOWED_EXTS]
+        if not files:
             raise Exception("unsupported url")
+        path = files[0]
+        ext = os.path.splitext(path)[1]
         resp = send_file(path, as_attachment=True, download_name=f"{title}{ext}")
         def cleanup():
             time.sleep(30)
-            try: os.remove(path)
-            except OSError: pass
+            remove_job_files(job_id)
         threading.Thread(target=cleanup, daemon=True).start()
         return resp
     except Exception as ex:
+        remove_job_files(job_id)
         return jsonify({"error": friendly_error_message(str(ex))}), 400
+    finally:
+        try: direct_slots.release()
+        except ValueError: pass
+
+@app.after_request
+def security_headers(resp):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    resp.headers.setdefault("Content-Security-Policy",
+        "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'self'")
+    if request.is_secure:
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    if request.path.startswith("/api/"):
+        resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 def open_browser():
     webbrowser.open("http://127.0.0.1:5000")

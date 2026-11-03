@@ -10,7 +10,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Run as a normal user, not root
+RUN useradd -m appuser && mkdir -p /app/downloads && chown -R appuser:appuser /app
+USER appuser
+
 ENV PORT=5000
+# We are behind the host's reverse proxy: trust X-Forwarded-For so rate limits use the real visitor IP
+ENV TRUST_PROXY=1
 EXPOSE 5000
 
 # IMPORTANT: keep ONE worker (job progress lives in this process's memory),
